@@ -30,7 +30,7 @@ Each release publishes its hash on the [GitHub release page](https://github.com/
 
 Open your validator page on [atomcircuit.net](https://atomcircuit.net). The referral ID is shown next to your referral link with a Copy button. Either the raw referral ID or your registered validator slug works as `referralId`; both resolve to the same on-chain validator.
 
-If you do not represent a validator (community sites, ecosystem aggregators, content creators, podcast hosts) you can still embed the widget. Use `referralId: 'general'` to split the affiliate fee equally across all participating validators (registered Atom Circuit validators that have received at least one swap attribution). The `referralId` option is **optional** since v1.1.0 - omitting it defaults to `'general'`, so the minimal install is literally one `mount()` call with no options.
+If you do not represent a validator (community sites, ecosystem aggregators, content creators, podcast hosts) you can still embed the widget. Use `referralId: 'general'` to split the affiliate fee equally across all participating validators (registered Atom Circuit validators that have received at least one swap attribution). `referralId` is optional - omit it and the SDK defaults to `'general'`, so the minimal install is one `mount()` call with no options.
 
 ## Quick start
 
@@ -119,7 +119,7 @@ Call `destroy()` when the host removes the widget from the DOM. The returned `wr
 
 ### `<AtomCircuitSwap />`
 
-Same options as `mount`, expressed as React props. Re-mounts the iframe only when `referralId`, `origin`, or `path` change; changing `theme`, `chrome`, `width`, `maxWidth`, `padding`, or `minHeight` after the initial mount is a silent no-op so a stylistic tweak does not drop the user's wallet session. To force a re-mount (and accept the wallet session drop), bump a `key=` on the component.
+Same options as `mount`, expressed as React props. Re-mounts the iframe only when `referralId`, `origin`, or `path` change; Changing `theme`, `chrome`, `width`, `maxWidth`, `padding`, or `minHeight` after the initial mount has no effect, so a stylistic tweak does not drop the user's wallet session. To force a re-mount (and accept the wallet session drop), bump a `key=` on the component.
 
 ## Theming
 
@@ -259,7 +259,7 @@ The widget runs inside a sandboxed iframe served from `atomcircuit.net`. It cann
 
 ### Subresource Integrity for CDN consumers
 
-Current SRI hash for `1.1.1`:
+Current SRI hash:
 
 ```html
 <script
@@ -293,7 +293,7 @@ Chromium 115+ partitions iframe storage by `(iframe origin, top-level site)`. A 
 ## Versioning
 
 - The npm package follows semver. Major bumps signal a breaking change to `mount()` or `<AtomCircuitSwap />`.
-- The iframe wire protocol version (`PROTOCOL_VERSION`, currently `1.0.0`) is independent of the npm package version. SDK and iframe negotiate at handshake time; a major mismatch surfaces as `onError` with `code: 'protocol_incompatible'`.
+- The iframe wire protocol version (`PROTOCOL_VERSION`) is independent of the npm package version. SDK and iframe negotiate at handshake time; a major mismatch surfaces as `onError` with `code: 'protocol_incompatible'`.
 
 ## Compatibility
 

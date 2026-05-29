@@ -18,7 +18,7 @@ body:
     attributes:
       label: SDK version
       description: Output of `npm ls @atom-circuit/embed-sdk` or the unpkg URL you used.
-      placeholder: "1.2.0"
+      placeholder: "1.2.1"
     validations:
       required: true
 
