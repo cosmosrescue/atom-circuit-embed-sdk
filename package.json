@@ -1,0 +1,125 @@
+{
+  "name": "@atom-circuit/embed-sdk",
+  "version": "1.2.0",
+  "description": "Embed the Atom Circuit swap widget on any website with one line. Carries a referralId so swap fees route to the host validator.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./react": {
+      "import": {
+        "types": "./dist/react.d.ts",
+        "default": "./dist/react.mjs"
+      },
+      "require": {
+        "types": "./dist/react.d.cts",
+        "default": "./dist/react.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "size": "size-limit",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "cosmos",
+    "atom",
+    "swap",
+    "widget",
+    "embed",
+    "skip",
+    "iframe",
+    "keplr",
+    "leap",
+    "cosmostation",
+    "validator",
+    "referral",
+    "staking",
+    "defi",
+    "cosmwasm",
+    "react-component"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cosmosrescue/atom-circuit-embed-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cosmosrescue/atom-circuit-embed-sdk/issues"
+  },
+  "homepage": "https://github.com/cosmosrescue/atom-circuit-embed-sdk#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "penpal": "~7.0.6"
+  },
+  "peerDependencies": {
+    "react": ">=17 <20",
+    "react-dom": ">=17 <20"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.46.0",
+    "@size-limit/preset-small-lib": "^12.1.0",
+    "@testing-library/react": "^16.0.0",
+    "@types/node": "^25.9.1",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "jsdom": "^29.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "size-limit": "^12.1.0",
+    "tsup": "^8.2.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "size-limit": [
+    {
+      "name": "iife (gzip)",
+      "path": "dist/atom-circuit.iife.js",
+      "limit": "25 KB",
+      "gzip": true
+    },
+    {
+      "name": "esm (gzip)",
+      "path": "dist/index.mjs",
+      "limit": "25 KB",
+      "gzip": true
+    }
+  ]
+}

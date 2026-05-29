@@ -1,0 +1,122 @@
+<!doctype html>
+<!--
+  Local preview. Loads the freshly-built IIFE from ../dist so the loading
+  overlay can be seen against the live atomcircuit.net iframe without
+  publishing to npm first. Serve from the SDK root and open
+  http://localhost:<port>/examples/local-preview.html
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atom Circuit embed - local preview</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #0d0f14;
+        color: #f5f6fa;
+        font-family: system-ui, sans-serif;
+      }
+      .host {
+        max-width: 480px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 1rem;
+        font-weight: 600;
+        margin: 0 0 12px 0;
+        color: #9BA1A6;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      button {
+        background: #1f2330;
+        color: #f5f6fa;
+        border: 1px solid #2a2f3e;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+      button:hover { background: #2a2f3e; }
+      #log {
+        margin-top: 16px;
+        font-family: ui-monospace, monospace;
+        font-size: 0.75rem;
+        color: #9BA1A6;
+        white-space: pre-wrap;
+        max-height: 140px;
+        overflow: auto;
+        border: 1px solid #1f2330;
+        border-radius: 6px;
+        padding: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="host">
+      <h1>Local SDK preview - watch the spinner before the iframe handshake completes</h1>
+      <div class="controls">
+        <button id="remount-general">Mount with referralId=general</button>
+        <button id="remount-specific">Mount with cosmosrescue</button>
+        <button id="destroy">Destroy</button>
+      </div>
+      <div id="atom-circuit-widget"></div>
+      <div id="log"></div>
+    </div>
+
+    <script src="../dist/atom-circuit.iife.js"></script>
+    <script>
+      const container = document.getElementById('atom-circuit-widget');
+      const logEl = document.getElementById('log');
+      let handle = null;
+
+      function log(msg) {
+        const ts = new Date().toISOString().slice(11, 23);
+        logEl.textContent = ts + ' ' + msg + '\n' + logEl.textContent;
+      }
+
+      function mount(referralId) {
+        if (handle) handle.destroy();
+        log('mounting with referralId=' + referralId);
+        const start = Date.now();
+        handle = AtomCircuit.mount(container, {
+          referralId: referralId,
+          theme: {
+            mode: 'dark',
+            accentColor: '#33D6FF',
+            background: '#0d0f14',
+            foreground: '#f5f6fa',
+            border: '#1f2330',
+          },
+          onReady: function (p) {
+            log('onReady (' + (Date.now() - start) + 'ms) protocol=' + p.protocolVersion);
+          },
+          onError: function (e) {
+            log('onError code=' + e.code + ' msg=' + e.message);
+          },
+        });
+      }
+
+      document.getElementById('remount-general').addEventListener('click', function () {
+        mount('general');
+      });
+      document.getElementById('remount-specific').addEventListener('click', function () {
+        mount('general');
+      });
+      document.getElementById('destroy').addEventListener('click', function () {
+        if (handle) {
+          handle.destroy();
+          handle = null;
+          log('destroyed');
+        }
+      });
+
+      mount('general');
+    </script>
+  </body>
+</html>

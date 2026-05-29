@@ -1,0 +1,22 @@
+<!doctype html>
+<!--
+  Minimal vanilla embed. One script tag, one container, one mount call.
+  Every other field on MountOptions is optional.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atom Circuit embed - minimal</title>
+  </head>
+  <body>
+    <div id="atom-circuit-widget"></div>
+
+    <script src="https://unpkg.com/@atom-circuit/embed-sdk@1.1.1/dist/atom-circuit.iife.js"></script>
+    <script>
+      AtomCircuit.mount(document.getElementById('atom-circuit-widget'), {
+        referralId: 'YOUR_REFERRAL_ID',
+      });
+    </script>
+  </body>
+</html>
