@@ -1,6 +1,6 @@
 {
   "name": "@atom-circuit/embed-sdk",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Embed the Atom Circuit swap widget on any website with one line. Carries a referralId so swap fees route to the host validator.",
   "license": "MIT",
   "type": "module",

@@ -18,7 +18,7 @@ For static sites that do not bundle, load the IIFE from a CDN with a pinned Subr
 
 ```html
 <script
-  src="https://unpkg.com/@atom-circuit/embed-sdk@1.2.0/dist/atom-circuit.iife.js"
+  src="https://unpkg.com/@atom-circuit/embed-sdk@1.2.1/dist/atom-circuit.iife.js"
   integrity="sha384-e0EM289L42Rs5yaVi2w+xv5Pwr6rAK9tLh5caDpIW5ADmulSQ97R3CXxC7T/R7D/"
   crossorigin="anonymous"
 ></script>
@@ -40,7 +40,7 @@ Pick the stack you ship with. Replace `YOUR_REFERRAL_ID` with the value from you
 
 ```html
 <div id="atom-circuit-widget"></div>
-<script src="https://unpkg.com/@atom-circuit/embed-sdk@1.2.0/dist/atom-circuit.iife.js"></script>
+<script src="https://unpkg.com/@atom-circuit/embed-sdk@1.2.1/dist/atom-circuit.iife.js"></script>
 <script>
   AtomCircuit.mount(document.getElementById('atom-circuit-widget'), {
     referralId: 'YOUR_REFERRAL_ID',
@@ -229,7 +229,7 @@ Use `AtomCircuit.mount()` directly into a persistent DOM container outside the r
 
 ```html
 <div id="atom-circuit-widget" style="display: none;"></div>
-<script src="https://unpkg.com/@atom-circuit/embed-sdk@1.2.0/dist/atom-circuit.iife.js"></script>
+<script src="https://unpkg.com/@atom-circuit/embed-sdk@1.2.1/dist/atom-circuit.iife.js"></script>
 <script>
   AtomCircuit.mount(document.getElementById('atom-circuit-widget'), {
     referralId: 'YOUR_REFERRAL_ID',
@@ -263,7 +263,7 @@ Current SRI hash for `1.1.1`:
 
 ```html
 <script
-  src="https://unpkg.com/@atom-circuit/embed-sdk@1.2.0/dist/atom-circuit.iife.js"
+  src="https://unpkg.com/@atom-circuit/embed-sdk@1.2.1/dist/atom-circuit.iife.js"
   integrity="sha384-e0EM289L42Rs5yaVi2w+xv5Pwr6rAK9tLh5caDpIW5ADmulSQ97R3CXxC7T/R7D/"
   crossorigin="anonymous"
 ></script>
@@ -272,7 +272,7 @@ Current SRI hash for `1.1.1`:
 Verify the hash yourself:
 
 ```sh
-curl -sL https://unpkg.com/@atom-circuit/embed-sdk@1.2.0/dist/atom-circuit.iife.js \
+curl -sL https://unpkg.com/@atom-circuit/embed-sdk@1.2.1/dist/atom-circuit.iife.js \
   | openssl dgst -sha384 -binary | openssl base64 -A
 ```
 
