@@ -1,0 +1,59 @@
+name: Feature request
+description: Propose a new capability or API on the embed SDK
+title: "[feature] <short description>"
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a change. Please scope the idea below so we
+        can decide whether it fits inside the embed SDK or belongs in
+        the dapp (atomcircuit.net) repository.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What can a host site not do today, and why does that matter?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: |
+        Concrete API or behaviour you would like. Code samples welcome.
+      render: ts
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: |
+        Workarounds you have tried or other shapes you considered.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: Where does this change live?
+      options:
+        - SDK (this repo)
+        - Dapp inside the iframe (atomcircuit.net)
+        - Both
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+    validations:
+      required: false

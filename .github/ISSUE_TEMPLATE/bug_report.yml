@@ -1,0 +1,86 @@
+name: Bug report
+description: Report a defect in the embed SDK
+title: "[bug] <short description>"
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill in the
+        sections below so we can reproduce the issue quickly.
+
+        For security-sensitive reports, please follow SECURITY.md
+        instead of filing a public issue.
+
+  - type: input
+    id: sdk-version
+    attributes:
+      label: SDK version
+      description: Output of `npm ls @atom-circuit/embed-sdk` or the unpkg URL you used.
+      placeholder: "1.2.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: integration
+    attributes:
+      label: Integration path
+      options:
+        - Vanilla HTML (IIFE)
+        - React
+        - Next.js
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: "Chrome 124, Safari 17.5, Firefox 126"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 14.5, Windows 11, Ubuntu 24.04"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: |
+        Either a code snippet that shows the failure or a link to a
+        repository / CodeSandbox. The smaller the repro, the faster we
+        can fix it.
+      render: ts
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include any console output, network errors, or screenshots.
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Anything else that might help (CSP headers, sandbox config, related issues).
+    validations:
+      required: false

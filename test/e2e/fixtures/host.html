@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Atom Circuit Embed SDK - cross-origin handshake host</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+      #status { padding: 8px 12px; font: 12px/1.4 ui-monospace, monospace; background: #f5f5f5; }
+      #container { width: 100%; min-height: 480px; }
+    </style>
+  </head>
+  <body>
+    <div id="status">booting...</div>
+    <div id="container"></div>
+
+    <!--
+      The SDK IIFE bundle is served by the IFRAME-origin server (port B) so
+      it is reachable cross-origin from this host page. That is fine for
+      this test because the SDK does not read its own origin; only the
+      iframe URL it constructs needs to point at the iframe origin.
+    -->
+    <script id="sdk-loader"></script>
+    <script>
+      (function bootstrap() {
+        var statusEl = document.getElementById('status');
+        function setStatus(text) { statusEl.textContent = text; }
+
+        var params = new URLSearchParams(window.location.search);
+        var iframeOrigin = params.get('iframeOrigin');
+        if (!iframeOrigin) {
+          setStatus('error: iframeOrigin query param missing');
+          window.__handshakeError = 'iframeOrigin query param missing';
+          return;
+        }
+
+        // Surface globals the Playwright test polls.
+        window.__hostOrigin = window.location.origin;
+        window.__iframeOrigin = iframeOrigin;
+        window.__events = []; // append-only log of every callback fire
+        window.__readyPayload = null;
+        window.__swapSubmittedPayload = null;
+        window.__swapSuccessPayload = null;
+        window.__mountError = null;
+        window.__destroyed = false;
+        // Promise the test awaits to know the handshake fully completed.
+        // Resolved when onReady fires.
+        window.__readyPromise = new Promise(function (resolve) {
+          window.__resolveReady = resolve;
+        });
+        // Resolved when onSwapSuccess fires.
+        window.__swapSuccessPromise = new Promise(function (resolve) {
+          window.__resolveSwapSuccess = resolve;
+        });
+
+        // The IIFE bundle is served by the iframe-origin server so the test
+        // does not need a third static-asset endpoint on the host origin.
+        var sdkLoader = document.getElementById('sdk-loader');
+        var sdkScript = document.createElement('script');
+        sdkScript.src = iframeOrigin + '/sdk.js';
+        sdkScript.onload = function () {
+          if (!window.AtomCircuit || typeof window.AtomCircuit.mount !== 'function') {
+            setStatus('error: AtomCircuit global missing after SDK load');
+            window.__handshakeError = 'AtomCircuit global missing';
+            return;
+          }
+          setStatus('SDK loaded, mounting...');
+          mountWidget();
+        };
+        sdkScript.onerror = function () {
+          setStatus('error: failed to load /sdk.js from ' + iframeOrigin);
+          window.__handshakeError = 'SDK load failed';
+        };
+        sdkLoader.parentNode.replaceChild(sdkScript, sdkLoader);
+
+        function mountWidget() {
+          var container = document.getElementById('container');
+
+          // The iframe needs to know our origin so its Penpal WindowMessenger
+          // can be configured with the right allowedOrigins. We forward it
+          // via the `path` MountOption which the SDK preserves verbatim in
+          // the iframe URL (the SDK appends its own `ref` + `v` query
+          // params after the existing query string). We use referralId
+          // 'e2e-test' so the URL also carries `?ref=e2e-test&v=1.0.0`.
+          var path = '/iframe.html?hostOrigin=' + encodeURIComponent(window.location.origin);
+
+          try {
+            var result = window.AtomCircuit.mount(container, {
+              referralId: 'e2e-test',
+              origin: iframeOrigin,
+              path: path,
+              minHeight: '480px',
+              onReady: function (payload) {
+                window.__events.push({ name: 'ready', payload: payload });
+                window.__readyPayload = payload;
+                setStatus('ready');
+                window.__resolveReady(payload);
+              },
+              onResize: function (info) {
+                window.__events.push({ name: 'resize', payload: info });
+              },
+              onSwapSubmitted: function (payload) {
+                window.__events.push({ name: 'swap:submitted', payload: payload });
+                window.__swapSubmittedPayload = payload;
+              },
+              onSwapSuccess: function (payload) {
+                window.__events.push({ name: 'swap:success', payload: payload });
+                window.__swapSuccessPayload = payload;
+                setStatus('swap:success ' + (payload && payload.txHash));
+                window.__resolveSwapSuccess(payload);
+              },
+              onSwapError: function (payload) {
+                window.__events.push({ name: 'swap:error', payload: payload });
+              },
+              onError: function (err) {
+                window.__events.push({ name: 'error', payload: err });
+                window.__mountError = { code: err.code, message: err.message };
+                setStatus('error: ' + err.code + ': ' + err.message);
+              },
+            });
+
+            window.__mountResult = {
+              hasIframe: !!result.iframe,
+              iframeSrc: result.iframe ? result.iframe.src : null,
+            };
+            // Expose a destroy hook so the test can clean up.
+            window.__destroy = function () {
+              result.destroy();
+              window.__destroyed = true;
+            };
+          } catch (mountErr) {
+            window.__handshakeError = 'mount threw: ' + (mountErr && mountErr.message);
+            setStatus('error: mount threw: ' + (mountErr && mountErr.message));
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>

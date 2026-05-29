@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Atom Circuit Embed SDK - mock dapp iframe</title>
+    <style>
+      html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+      .pad { padding: 24px; }
+      #state { font: 12px/1.4 ui-monospace, monospace; background: #eef; padding: 6px 10px; }
+    </style>
+  </head>
+  <body>
+    <div id="state">iframe booting...</div>
+    <div class="pad">Mock Atom Circuit swap widget</div>
+
+    <script src="/penpal.min.js"></script>
+    <script>
+      (function bootstrap() {
+        var stateEl = document.getElementById('state');
+        function setState(text) { stateEl.textContent = text; }
+
+        var params = new URLSearchParams(window.location.search);
+        var hostOrigin = params.get('hostOrigin');
+        var referralId = params.get('ref');
+        var protocolVersion = params.get('v') || '1.0.0';
+        if (!hostOrigin) {
+          setState('error: hostOrigin missing');
+          return;
+        }
+
+        // Real Penpal handshake against the host. We accept SYN/ACK only
+        // from the configured host origin; matches the SDK's allowedOrigin
+        // policy on the other side.
+        var messenger = new Penpal.WindowMessenger({
+          remoteWindow: window.parent,
+          allowedOrigins: [hostOrigin],
+        });
+
+        // Methods we expose to the host. The SDK does not call any of these
+        // in the happy path, but we expose `ping` because the SDK's
+        // RemoteMethods type advertises it, and Penpal needs at least one
+        // matched method path for ACK1 to carry useful content. (Penpal
+        // tolerates an empty methods bag; including `ping` keeps the
+        // handshake closer to the real iframe contract.)
+        var iframeMethods = {
+          ping: function () { return protocolVersion; },
+        };
+
+        var connection = Penpal.connect({
+          messenger: messenger,
+          methods: iframeMethods,
+          timeout: 10000,
+        });
+
+        connection.promise.then(function () {
+          setState('penpal connected, sending handshake to ' + hostOrigin);
+          // Raw-postMessage handshake (the SDK accepts this path; see
+          // src/iframe-client.ts handleRawMessage). Using the raw path
+          // (rather than RPC into the host's `handshake` method) keeps
+          // the test independent of which RPC channel the production
+          // dapp ultimately picks.
+          window.parent.postMessage(
+            {
+              type: 'handshake',
+              protocolVersion: protocolVersion,
+              capabilities: [
+                'swap.submit',
+                'swap.status',
+                'resize.report',
+                'events.stream',
+              ],
+            },
+            hostOrigin
+          );
+
+          // Fire the `ready` event. The SDK emits onReady when this
+          // arrives (it also emits onReady on handshake receipt via the
+          // RPC method, but the raw-postMessage handshake above does not
+          // trigger onReady directly - the event stream does).
+          window.parent.postMessage(
+            {
+              type: 'atomcircuit:event',
+              name: 'ready',
+              payload: { protocolVersion: protocolVersion },
+            },
+            hostOrigin
+          );
+
+          window.__handshakeSent = true;
+          setState('handshake + ready sent');
+        }).catch(function (err) {
+          setState('penpal connect failed: ' + (err && err.message));
+          window.__handshakeError = err && err.message;
+        });
+
+        // Expose helpers the Playwright test can drive via
+        // `frameLocator.evaluate(...)` to emit downstream events. Keeping
+        // these as plain functions (not wired through Penpal methods)
+        // mirrors how the real dapp will emit swap progress: it owns the
+        // moment of broadcast, not the host.
+        window.__emitSwapSubmitted = function (payload) {
+          window.parent.postMessage(
+            {
+              type: 'atomcircuit:event',
+              name: 'swap:submitted',
+              payload: payload,
+            },
+            hostOrigin
+          );
+        };
+        window.__emitSwapSuccess = function (payload) {
+          window.parent.postMessage(
+            {
+              type: 'atomcircuit:event',
+              name: 'swap:success',
+              payload: payload,
+            },
+            hostOrigin
+          );
+        };
+
+        // Useful diagnostics surfaced to the test via frameLocator.evaluate.
+        window.__referralId = referralId;
+        window.__hostOrigin = hostOrigin;
+        window.__protocolVersion = protocolVersion;
+      })();
+    </script>
+  </body>
+</html>
