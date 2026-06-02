@@ -158,6 +158,21 @@ export function validateChrome(chrome: unknown): ChromeOptions | null {
 }
 
 /**
+ * Validate the host-supplied `allowReferralChoice` flag. Returns `true` only
+ * when the input is the strict boolean `true`; every other value (including
+ * `false`, `undefined`, numbers, strings, objects) collapses to `false`.
+ *
+ * The asymmetry is intentional: the wire only ever carries the flag when it
+ * is `true` (see {@link encodeTheme}), so the default-false path produces a
+ * payload byte-identical to the prior protocol output. An invalid value is
+ * dropped (treated as false) rather than rejecting the whole theme, matching
+ * the orthogonal-toggle discipline used for chrome.
+ */
+export function validateAllowReferralChoice(value: unknown): boolean {
+  return value === true;
+}
+
+/**
  * Encode a validated theme as URL-safe base64(JSON). Skips null/undefined
  * fields so the encoded payload only carries keys actually set by the host.
  *
@@ -166,13 +181,19 @@ export function validateChrome(chrome: unknown): ChromeOptions | null {
  * iframe-URL parameter carries both. The dapp side decodes the combined
  * payload and applies each half independently.
  *
+ * An optional `allowReferralChoice` flag is attached under the reserved
+ * top-level `allowReferralChoice` key, but ONLY when it is the strict boolean
+ * `true`. The default (`false` / `undefined`) is omitted so a no-config embed
+ * produces a payload byte-identical to the prior protocol output.
+ *
  * Browser path uses `btoa(JSON.stringify(payload))`. Node fallback (tests)
  * uses `Buffer.from(...).toString('base64')`. Either way the output is
  * standard base64 - the dapp side decodes with the matching primitive.
  */
 export function encodeTheme(
   theme: ThemeOptions,
-  chrome?: ChromeOptions | null
+  chrome?: ChromeOptions | null,
+  allowReferralChoice?: boolean
 ): string {
   const compact: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(theme)) {
@@ -188,6 +209,9 @@ export function encodeTheme(
     if (Object.keys(chromeCompact).length > 0) {
       compact['chrome'] = chromeCompact;
     }
+  }
+  if (allowReferralChoice === true) {
+    compact['allowReferralChoice'] = true;
   }
   const json = JSON.stringify(compact);
   if (typeof btoa === 'function') {

@@ -17,7 +17,12 @@ import {
   type SwapSubmittedPayload,
   type SwapSuccessPayload,
 } from './protocol.js';
-import { encodeTheme, validateChrome, validateTheme } from './theme.js';
+import {
+  encodeTheme,
+  validateAllowReferralChoice,
+  validateChrome,
+  validateTheme,
+} from './theme.js';
 
 export type { MountOptions, MountError, MountErrorCode };
 export type { WidgetEvent } from './protocol.js';
@@ -79,7 +84,7 @@ export interface MountResult {
 
 type BuildSrcOpts = Pick<
   MountOptions,
-  'origin' | 'path' | 'theme' | 'chrome'
+  'origin' | 'path' | 'theme' | 'chrome' | 'allowReferralChoice'
 > & {
   /** Resolved referralId. mount() defaults undefined/empty to 'general'
    * before calling buildSrc, so this is always a non-empty string here. */
@@ -112,10 +117,29 @@ function buildSrc(opts: BuildSrcOpts): string {
     );
   }
 
-  if (validatedTheme !== null || validatedChrome !== null) {
+  // allowReferralChoice collapses to a strict boolean; only the literal `true`
+  // is carried on the wire (default-false path stays byte-identical to prior
+  // output). An invalid value is silently dropped (treated as false) rather
+  // than rejecting the rest of the payload.
+  const allowReferralChoice = validateAllowReferralChoice(
+    opts.allowReferralChoice
+  );
+
+  // Set the `theme` param when ANY of theme / chrome / allowReferralChoice is
+  // present so a host can opt into referral choice without supplying a theme
+  // or chrome override.
+  if (
+    validatedTheme !== null ||
+    validatedChrome !== null ||
+    allowReferralChoice
+  ) {
     params.set(
       'theme',
-      encodeTheme(validatedTheme ?? {}, validatedChrome ?? undefined)
+      encodeTheme(
+        validatedTheme ?? {},
+        validatedChrome ?? undefined,
+        allowReferralChoice
+      )
     );
   }
 
@@ -237,6 +261,9 @@ export function mount(container: HTMLElement, opts: MountOptions = {}): MountRes
     ...(opts.path !== undefined ? { path: opts.path } : {}),
     ...(opts.theme !== undefined ? { theme: opts.theme } : {}),
     ...(opts.chrome !== undefined ? { chrome: opts.chrome } : {}),
+    ...(opts.allowReferralChoice !== undefined
+      ? { allowReferralChoice: opts.allowReferralChoice }
+      : {}),
     warn: warnSink,
   });
   iframe.setAttribute('sandbox', SANDBOX_ATTR);
@@ -506,7 +533,10 @@ function classifyInitError(message: string): MountErrorCode {
  * `warn` sink to observe validation failures during tests.
  */
 export function buildIframeSrc(
-  opts: Pick<MountOptions, 'referralId' | 'origin' | 'path' | 'theme' | 'chrome'> & {
+  opts: Pick<
+    MountOptions,
+    'referralId' | 'origin' | 'path' | 'theme' | 'chrome' | 'allowReferralChoice'
+  > & {
     readonly warn?: (message: string) => void;
   }
 ): string {

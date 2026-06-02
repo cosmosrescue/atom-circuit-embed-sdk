@@ -314,6 +314,28 @@ export interface MountOptions {
    */
   readonly chrome?: ChromeOptions;
   /**
+   * Whether the embed lets the end user choose which validator the swap
+   * affiliate fee stakes to. Default `false`.
+   *
+   * - When `false` (default): `referralId` is the fixed affiliate for every
+   *   swap in this embed. The end user cannot change it. This is the prior,
+   *   unchanged behaviour - the embed shows the read-only validator badge
+   *   (subject to the `chrome.validator` toggle) and `referralId` rides the
+   *   `?ref=` URL param.
+   * - When `true`: the embed renders an interactive validator picker with
+   *   `referralId` pre-selected as the DEFAULT (or the `general` pool when
+   *   `referralId` is unset). The end user may switch to any participating
+   *   validator; their pick persists locally and seeds subsequent swaps. The
+   *   picker shows regardless of the `chrome.validator` badge toggle.
+   *
+   * Encoded alongside `theme` + `chrome` inside the `?theme=` base64-JSON
+   * payload under the top-level `allowReferralChoice` key. Only the literal
+   * boolean `true` is carried on the wire; any other value (including the
+   * default `false`) is omitted so a no-config embed is byte-identical to the
+   * prior protocol output.
+   */
+  readonly allowReferralChoice?: boolean;
+  /**
    * CSS `width` applied to the iframe. Default `'100%'` when omitted.
    */
   readonly width?: string;

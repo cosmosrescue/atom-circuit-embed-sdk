@@ -93,6 +93,16 @@ export interface AtomCircuitSwapProps {
    * full surface. See {@link ChromeOptions}.
    */
   chrome?: ChromeOptions;
+  /**
+   * Whether the embed lets the end user choose which validator the swap
+   * affiliate fee stakes to. Default `false`. When `false`, `referralId` is
+   * the fixed affiliate (unchanged behaviour). When `true`, the embed renders
+   * an interactive validator picker with `referralId` pre-selected as the
+   * default (or the `general` pool when unset); the user's pick persists and
+   * the picker shows regardless of the `chrome.validator` badge toggle. See
+   * {@link MountOptions.allowReferralChoice}.
+   */
+  allowReferralChoice?: boolean;
   /** CSS width for the iframe. Default `'100%'`. */
   width?: string;
   /** CSS max-width for the iframe. Default unset. */
@@ -130,6 +140,9 @@ export function AtomCircuitSwap(props: AtomCircuitSwapProps): ReactElement | nul
       ...(propsRef.current.minHeight !== undefined ? { minHeight: propsRef.current.minHeight } : {}),
       ...(propsRef.current.theme !== undefined ? { theme: propsRef.current.theme } : {}),
       ...(propsRef.current.chrome !== undefined ? { chrome: propsRef.current.chrome } : {}),
+      ...(propsRef.current.allowReferralChoice !== undefined
+        ? { allowReferralChoice: propsRef.current.allowReferralChoice }
+        : {}),
       ...(propsRef.current.width !== undefined ? { width: propsRef.current.width } : {}),
       ...(propsRef.current.maxWidth !== undefined ? { maxWidth: propsRef.current.maxWidth } : {}),
       ...(propsRef.current.padding !== undefined ? { padding: propsRef.current.padding } : {}),

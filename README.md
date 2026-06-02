@@ -18,8 +18,8 @@ For static sites that do not bundle, load the IIFE from a CDN with a pinned Subr
 
 ```html
 <script
-  src="https://unpkg.com/@atom-circuit/embed-sdk@1.2.2/dist/atom-circuit.iife.js"
-  integrity="sha384-e0EM289L42Rs5yaVi2w+xv5Pwr6rAK9tLh5caDpIW5ADmulSQ97R3CXxC7T/R7D/"
+  src="https://unpkg.com/@atom-circuit/embed-sdk@1.3.0/dist/atom-circuit.iife.js"
+  integrity="sha384-PVs051K7IWucBZOIhYvYhsLwTpLW+8Cy36JaiwA/wlwb4W1CcEB8CD7NqdDW4+lI"
   crossorigin="anonymous"
 ></script>
 ```
@@ -40,7 +40,7 @@ Pick the stack you ship with. Replace `YOUR_REFERRAL_ID` with the value from you
 
 ```html
 <div id="atom-circuit-widget"></div>
-<script src="https://unpkg.com/@atom-circuit/embed-sdk@1.2.2/dist/atom-circuit.iife.js"></script>
+<script src="https://unpkg.com/@atom-circuit/embed-sdk@1.3.0/dist/atom-circuit.iife.js"></script>
 <script>
   AtomCircuit.mount(document.getElementById('atom-circuit-widget'), {
     referralId: 'YOUR_REFERRAL_ID',
@@ -97,6 +97,8 @@ Each stack has a fully-wired example that demonstrates every option and every ca
 ```ts
 const { iframe, wrapper, client, destroy } = AtomCircuit.mount(container, {
   referralId: 'YOUR_REFERRAL_ID',
+  // let the end user pick the validator (default false); referralId is the pre-selected default
+  allowReferralChoice: false,
   // sizing - all optional
   width: '100%',
   maxWidth: '480px',
@@ -120,6 +122,10 @@ Call `destroy()` when the host removes the widget from the DOM. The returned `wr
 ### `<AtomCircuitSwap />`
 
 Same options as `mount`, expressed as React props. Re-mounts the iframe only when `referralId`, `origin`, or `path` change; Changing `theme`, `chrome`, `width`, `maxWidth`, `padding`, or `minHeight` after the initial mount has no effect, so a stylistic tweak does not drop the user's wallet session. To force a re-mount (and accept the wallet session drop), bump a `key=` on the component.
+
+### Letting the user choose the validator
+
+By default the host site's `referralId` is fixed and the end user cannot change it. Set `allowReferralChoice: true` to render a validator picker inside the widget: your `referralId` becomes the pre-selected default, the user can switch to any participating validator (or clear it to split across all via `general`), and their choice is remembered across reloads. Leaving it `false` (the default) is fully backwards-compatible - the fixed-`referralId` behaviour is unchanged.
 
 ## Theming
 
@@ -229,7 +235,7 @@ Use `AtomCircuit.mount()` directly into a persistent DOM container outside the r
 
 ```html
 <div id="atom-circuit-widget" style="display: none;"></div>
-<script src="https://unpkg.com/@atom-circuit/embed-sdk@1.2.2/dist/atom-circuit.iife.js"></script>
+<script src="https://unpkg.com/@atom-circuit/embed-sdk@1.3.0/dist/atom-circuit.iife.js"></script>
 <script>
   AtomCircuit.mount(document.getElementById('atom-circuit-widget'), {
     referralId: 'YOUR_REFERRAL_ID',
@@ -263,8 +269,8 @@ Current SRI hash:
 
 ```html
 <script
-  src="https://unpkg.com/@atom-circuit/embed-sdk@1.2.2/dist/atom-circuit.iife.js"
-  integrity="sha384-e0EM289L42Rs5yaVi2w+xv5Pwr6rAK9tLh5caDpIW5ADmulSQ97R3CXxC7T/R7D/"
+  src="https://unpkg.com/@atom-circuit/embed-sdk@1.3.0/dist/atom-circuit.iife.js"
+  integrity="sha384-PVs051K7IWucBZOIhYvYhsLwTpLW+8Cy36JaiwA/wlwb4W1CcEB8CD7NqdDW4+lI"
   crossorigin="anonymous"
 ></script>
 ```
@@ -272,7 +278,7 @@ Current SRI hash:
 Verify the hash yourself:
 
 ```sh
-curl -sL https://unpkg.com/@atom-circuit/embed-sdk@1.2.2/dist/atom-circuit.iife.js \
+curl -sL https://unpkg.com/@atom-circuit/embed-sdk@1.3.0/dist/atom-circuit.iife.js \
   | openssl dgst -sha384 -binary | openssl base64 -A
 ```
 

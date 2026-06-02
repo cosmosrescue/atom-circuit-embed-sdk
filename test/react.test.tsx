@@ -40,6 +40,30 @@ describe('<AtomCircuitSwap />', () => {
     expect(iframes.length).toBe(1);
   });
 
+  it('forwards allowReferralChoice into the iframe theme blob', () => {
+    const { container } = render(
+      <AtomCircuitSwap referralId="val1" allowReferralChoice />
+    );
+    const iframe = container.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    const url = new URL((iframe as HTMLIFrameElement).src);
+    expect(url.searchParams.get('ref')).toBe('val1');
+    const param = url.searchParams.get('theme');
+    expect(param).not.toBeNull();
+    const json =
+      typeof atob === 'function'
+        ? atob(param as string)
+        : Buffer.from(param as string, 'base64').toString('utf-8');
+    expect(JSON.parse(json)).toEqual({ allowReferralChoice: true });
+  });
+
+  it('omits the theme blob when allowReferralChoice is absent (backwards-compat)', () => {
+    const { container } = render(<AtomCircuitSwap referralId="val1" />);
+    const iframe = container.querySelector('iframe');
+    const url = new URL((iframe as HTMLIFrameElement).src);
+    expect(url.searchParams.has('theme')).toBe(false);
+  });
+
   it('StrictMode double-effect produces exactly one persisted iframe', () => {
     // React 18 StrictMode in dev runs effects twice (mount, cleanup, mount).
     // The wrapper must destroy the first instance during cleanup so the

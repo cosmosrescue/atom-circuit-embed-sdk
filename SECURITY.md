@@ -47,8 +47,8 @@ Use the output in the `<script>` tag:
 
 ```html
 <script
-  src="https://unpkg.com/@atom-circuit/embed-sdk@1.2.2/dist/atom-circuit.iife.js"
-  integrity="sha384-e0EM289L42Rs5yaVi2w+xv5Pwr6rAK9tLh5caDpIW5ADmulSQ97R3CXxC7T/R7D/"
+  src="https://unpkg.com/@atom-circuit/embed-sdk@1.3.0/dist/atom-circuit.iife.js"
+  integrity="sha384-PVs051K7IWucBZOIhYvYhsLwTpLW+8Cy36JaiwA/wlwb4W1CcEB8CD7NqdDW4+lI"
   crossorigin="anonymous"
 ></script>
 ```

@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 
-import { encodeTheme, validateChrome, validateTheme } from '../src/theme.js';
+import {
+  encodeTheme,
+  validateAllowReferralChoice,
+  validateChrome,
+  validateTheme,
+} from '../src/theme.js';
 import type { ChromeOptions, ThemeOptions } from '../src/protocol.js';
 
 describe('validateTheme', () => {
@@ -343,5 +348,85 @@ describe('validateChrome', () => {
       const parsed = JSON.parse(decode(encoded)) as Record<string, unknown>;
       expect(parsed['chrome']).toEqual({ logo: false });
     });
+  });
+});
+
+describe('validateAllowReferralChoice', () => {
+  it('returns true only for the strict boolean true', () => {
+    expect(validateAllowReferralChoice(true)).toBe(true);
+  });
+
+  it('returns false for the strict boolean false', () => {
+    expect(validateAllowReferralChoice(false)).toBe(false);
+  });
+
+  it('returns false for undefined (the default-absent path)', () => {
+    expect(validateAllowReferralChoice(undefined)).toBe(false);
+  });
+
+  it('drops truthy-but-non-boolean values (invalid -> false)', () => {
+    expect(validateAllowReferralChoice(1)).toBe(false);
+    expect(validateAllowReferralChoice('true')).toBe(false);
+    expect(validateAllowReferralChoice('yes')).toBe(false);
+    expect(validateAllowReferralChoice({})).toBe(false);
+    expect(validateAllowReferralChoice([])).toBe(false);
+    expect(validateAllowReferralChoice(null)).toBe(false);
+  });
+});
+
+describe('encodeTheme with allowReferralChoice', () => {
+  function decode(b64: string): string {
+    return typeof atob === 'function'
+      ? atob(b64)
+      : Buffer.from(b64, 'base64').toString('utf-8');
+  }
+
+  it('attaches allowReferralChoice:true at the top level when true', () => {
+    const theme: ThemeOptions = { mode: 'dark' };
+    const encoded = encodeTheme(theme, undefined, true);
+    const parsed = JSON.parse(decode(encoded)) as Record<string, unknown>;
+    expect(parsed['mode']).toBe('dark');
+    expect(parsed['allowReferralChoice']).toBe(true);
+  });
+
+  it('rides alongside theme + chrome in a single blob', () => {
+    const theme: ThemeOptions = { mode: 'dark', accentColor: '#abc' };
+    const chrome: ChromeOptions = { wallet: false };
+    const encoded = encodeTheme(theme, chrome, true);
+    const parsed = JSON.parse(decode(encoded)) as Record<string, unknown>;
+    expect(parsed['mode']).toBe('dark');
+    expect(parsed['accentColor']).toBe('#abc');
+    expect(parsed['chrome']).toEqual({ wallet: false });
+    expect(parsed['allowReferralChoice']).toBe(true);
+  });
+
+  it('allows an allowReferralChoice-only payload (empty theme, no chrome)', () => {
+    const encoded = encodeTheme({}, undefined, true);
+    const parsed = JSON.parse(decode(encoded)) as Record<string, unknown>;
+    expect(parsed).toEqual({ allowReferralChoice: true });
+  });
+
+  it('omits the key when allowReferralChoice is false (backwards-compat)', () => {
+    const theme: ThemeOptions = { mode: 'dark' };
+    const encoded = encodeTheme(theme, undefined, false);
+    const parsed = JSON.parse(decode(encoded)) as Record<string, unknown>;
+    expect(parsed).not.toHaveProperty('allowReferralChoice');
+  });
+
+  it('omits the key when allowReferralChoice is undefined (backwards-compat)', () => {
+    const theme: ThemeOptions = { mode: 'dark' };
+    const encoded = encodeTheme(theme);
+    const parsed = JSON.parse(decode(encoded)) as Record<string, unknown>;
+    expect(parsed).not.toHaveProperty('allowReferralChoice');
+  });
+
+  it('produces a byte-identical blob to the prior 2-arg call when flag absent', () => {
+    const theme: ThemeOptions = { mode: 'dark', accentColor: '#abc' };
+    const chrome: ChromeOptions = { logo: false };
+    // 2-arg call (prior protocol output) vs 3-arg with undefined flag.
+    expect(encodeTheme(theme, chrome)).toBe(
+      encodeTheme(theme, chrome, undefined)
+    );
+    expect(encodeTheme(theme, chrome)).toBe(encodeTheme(theme, chrome, false));
   });
 });

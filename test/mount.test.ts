@@ -327,6 +327,66 @@ describe('buildIframeSrc()', () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0]?.[0]).toMatch(/chrome validation failed/);
   });
+
+  function decodeThemeParam(param: string): Record<string, unknown> {
+    const json =
+      typeof atob === 'function'
+        ? atob(param)
+        : Buffer.from(param, 'base64').toString('utf-8');
+    return JSON.parse(json) as Record<string, unknown>;
+  }
+
+  it('sets the theme param carrying allowReferralChoice with no theme/chrome', () => {
+    const url = buildIframeSrc({ referralId: 'val1', allowReferralChoice: true });
+    const parsed = new URL(url);
+    // ref still rides ?ref= as the default.
+    expect(parsed.searchParams.get('ref')).toBe('val1');
+    const param = parsed.searchParams.get('theme');
+    expect(param).not.toBeNull();
+    expect(decodeThemeParam(param as string)).toEqual({
+      allowReferralChoice: true,
+    });
+  });
+
+  it('rides allowReferralChoice alongside theme + chrome in one blob', () => {
+    const theme: ThemeOptions = { mode: 'dark', accentColor: '#abc' };
+    const chrome: ChromeOptions = { validator: false };
+    const url = buildIframeSrc({
+      referralId: 'val1',
+      theme,
+      chrome,
+      allowReferralChoice: true,
+    });
+    const param = new URL(url).searchParams.get('theme');
+    expect(param).toBe(encodeTheme(theme, chrome, true));
+    const decoded = decodeThemeParam(param as string);
+    expect(decoded['mode']).toBe('dark');
+    expect(decoded['chrome']).toEqual(chrome);
+    expect(decoded['allowReferralChoice']).toBe(true);
+  });
+
+  it('does NOT set a theme param when allowReferralChoice is false and nothing else supplied (backwards-compat)', () => {
+    const url = buildIframeSrc({ referralId: 'val1', allowReferralChoice: false });
+    expect(new URL(url).searchParams.has('theme')).toBe(false);
+  });
+
+  it('drops an invalid (non-boolean) allowReferralChoice (treated as false)', () => {
+    const url = buildIframeSrc({
+      referralId: 'val1',
+      allowReferralChoice: 'true' as unknown as boolean,
+    });
+    // 'true' is not the strict boolean true -> dropped -> no theme param.
+    expect(new URL(url).searchParams.has('theme')).toBe(false);
+  });
+
+  it('keeps a no-config URL byte-identical to the pre-feature output', () => {
+    const before = buildIframeSrc({ referralId: 'val1' });
+    const withFalse = buildIframeSrc({
+      referralId: 'val1',
+      allowReferralChoice: false,
+    });
+    expect(withFalse).toBe(before);
+  });
 });
 
 describe('mount() sizing + theming', () => {
