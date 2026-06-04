@@ -77,4 +77,5 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: v${{ steps.notes.outputs.version }}
           body_path: release-notes.md
+          files: dist/atom-circuit.iife.js*
           make_latest: true
