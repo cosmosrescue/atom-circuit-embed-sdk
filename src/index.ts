@@ -12,15 +12,44 @@
 
 export { mount, PROTOCOL_VERSION } from './mount.js';
 export type { MountOptions, MountResult } from './mount.js';
+export { WALLET_SIGNAL_NS, EVM_BRIDGE_NS } from './protocol.js';
 export type {
   ChromeOptions,
+  Eip1193ProviderLike,
   MountError,
   MountErrorCode,
+  OfflineSignerLike,
   ReadyPayload,
   SwapErrorPayload,
   SwapRouteSummary,
   SwapSubmittedPayload,
   SwapSuccessPayload,
   ThemeOptions,
+  WalletCapabilitiesMessage,
+  WalletChannel,
+  WalletConnectRequestMessage,
+  WalletCosmosHandle,
+  WalletEvmHandle,
+  WalletGoneMessage,
+  WalletHelloMessage,
+  WalletOptions,
+  WalletReadyMessage,
+  WalletSignalMessage,
   WidgetEvent,
 } from './protocol.js';
+export {
+  fromCosmosKit,
+  fromInjectedCosmosWallet,
+  fromKeplr,
+  fromWagmi,
+} from './helpers.js';
+export type {
+  CosmosKitClientLike,
+  DerivedCosmosAccount,
+  DerivedCosmosSimpleAccount,
+  FromCosmosKitOptions,
+  FromInjectedCosmosWalletOptions,
+  FromKeplrOptions,
+  KeplrInjectedProviderLike,
+  KeplrKeyLike,
+} from './helpers.js';

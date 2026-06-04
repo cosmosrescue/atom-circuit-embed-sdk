@@ -21,6 +21,13 @@ export interface ResizeHandle {
 const DEFAULT_MIN_HEIGHT = '480px';
 
 /**
+ * Upper bound applied to any reported height. A bogus or hostile resize message
+ * cannot grow the iframe past this; it is large enough that no legitimate swap
+ * UI is ever clipped.
+ */
+const MAX_HEIGHT_PX = 20000;
+
+/**
  * Parses a CSS length like "480px" or "30rem" into pixels. Falls back to 0
  * when the unit is not recognised.
  */
@@ -56,7 +63,9 @@ export function attachResize(opts: ResizeOptions): ResizeHandle {
 
   const apply = (height: number): void => {
     if (destroyed) return;
-    const clamped = Math.max(height, minPx);
+    // Floor at minHeight, cap at MAX_HEIGHT_PX so a bogus/hostile height cannot
+    // set an absurd iframe size.
+    const clamped = Math.min(Math.max(height, minPx), MAX_HEIGHT_PX);
     if (clamped === lastApplied) return;
     iframe.style.height = `${clamped}px`;
     lastApplied = clamped;
@@ -95,3 +104,4 @@ export function attachResize(opts: ResizeOptions): ResizeHandle {
 }
 
 export const RESIZE_DEFAULT_MIN_HEIGHT = DEFAULT_MIN_HEIGHT;
+export const RESIZE_MAX_HEIGHT_PX = MAX_HEIGHT_PX;

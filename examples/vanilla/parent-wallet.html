@@ -1,0 +1,147 @@
+<!doctype html>
+<!--
+  Parent-wallet embed (vanilla CDN / IIFE build): the widget reuses the wallet
+  already connected on your page.
+
+  This example imitates an integrator dapp that already has wallet connection in
+  its own header. The host page connects the wallet, and the widget adopts it via
+  setWallet, so the end user never connects a second time. Both connect paths
+  work: the host's own Connect buttons, and the Connect control inside the widget
+  (which calls back into the same host connect function via onWalletConnectRequest).
+
+  Parent-wallet mode needs no configuration: the widget trusts its actual
+  embedding origin, which the browser supplies and a page cannot spoof.
+
+  The IIFE global exposes the same helpers as the npm package:
+  AtomCircuit.fromInjectedCosmosWallet (alias fromKeplr), fromCosmosKit, fromWagmi.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atom Circuit embed - parent wallet</title>
+  </head>
+  <body>
+    <!-- The integrator's own wallet connection, the same header a real host page
+         already renders. Connecting here hands the wallet to the widget. -->
+    <header id="wallet-controls" style="display: flex; gap: 8px; padding: 12px 0; font-family: system-ui, sans-serif; font-size: 14px;">
+      <button type="button" id="connect-cosmos">Connect Cosmos</button>
+      <button type="button" id="connect-evm">Connect EVM</button>
+    </header>
+    <div id="atom-circuit-widget"></div>
+
+    <script
+      src="https://unpkg.com/@atom-circuit/embed-sdk@2.1.0/dist/atom-circuit.iife.js"
+      integrity="sha384-rZ29F2zRBfHEVxJldYGp/+NjMEXyVfDbGB9ifxpw0kub3yQoAWxYKeYbn7t42mBe"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      // Your validator referral id - swap fees stake to this validator. Replace
+      // 'general' with your own id; 'general' is the shared pool that fans fees across
+      // all participating validators, so this page runs without configuration.
+      var REFERRAL_ID = 'general';
+
+      // The Cosmos chain the host connects against to read the address shown in
+      // the header. The widget handles per-chain signing itself once the handle
+      // is set.
+      var COSMOS_CHAIN_ID = 'cosmoshub-4';
+
+      // The live mount handle, set by mountWidget. Used by the connect functions
+      // to push wallet handles via setWallet.
+      var widget = null;
+
+      // Read an injected Cosmos provider. Keplr lives at window.keplr;
+      // Cosmostation exposes the same Keplr API at
+      // window.cosmostation.providers.keplr.
+      function getInjectedCosmosProvider() {
+        return (
+          window.keplr ||
+          (window.cosmostation &&
+            window.cosmostation.providers &&
+            window.cosmostation.providers.keplr)
+        );
+      }
+
+      // Connect the parent-page Cosmos wallet, build a handle with the global
+      // helper, adopt it into the live widget, and show the address in the
+      // header. Called by the Connect button and by onWalletConnectRequest.
+      function connectCosmos() {
+        var provider = getInjectedCosmosProvider();
+        if (!provider) {
+          console.warn('No injected Cosmos wallet found (Keplr / Cosmostation).');
+          return;
+        }
+        Promise.resolve(provider.enable && provider.enable(COSMOS_CHAIN_ID))
+          .then(function () {
+            return provider.getKey && provider.getKey(COSMOS_CHAIN_ID);
+          })
+          .then(function (key) {
+            widget.setWallet({
+              cosmos: AtomCircuit.fromInjectedCosmosWallet(provider, {
+                metadata: { name: 'My App' },
+              }),
+            });
+            if (key) {
+              document.getElementById('connect-cosmos').textContent =
+                'Cosmos: ' + key.bech32Address;
+            }
+          });
+      }
+
+      // Connect the parent-page EVM wallet. Any EIP-1193 provider satisfies the
+      // handle: window.ethereum, or a resolved wagmi provider via
+      // `await connector.getProvider()`.
+      function connectEvm() {
+        var provider = window.ethereum;
+        if (!provider) {
+          console.warn('No injected EVM wallet found.');
+          return;
+        }
+        provider.request({ method: 'eth_requestAccounts' }).then(function (accounts) {
+          widget.setWallet({ evm: AtomCircuit.fromWagmi(provider) });
+          if (accounts && accounts[0]) {
+            document.getElementById('connect-evm').textContent = 'EVM: ' + accounts[0];
+          }
+        });
+      }
+
+      // Mount the widget in parent-wallet mode. The wallet is wired later by the
+      // connect functions, so the widget renders now and adopts the wallet once
+      // setWallet is called.
+      widget = AtomCircuit.mount(document.getElementById('atom-circuit-widget'), {
+        // Required.
+        referralId: REFERRAL_ID,
+        minHeight: '520px',
+
+        // Reuse the wallet connected on this page. mode bakes into the iframe
+        // URL; a later setWallet call is adopted live with no remount.
+        wallet: {
+          mode: 'parent',
+        },
+        // The in-widget Connect control routes here too, so clicking Connect
+        // inside the widget runs the same host connect flow.
+        onWalletConnectRequest: function (channel) {
+          if (channel === 'cosmos') connectCosmos();
+          else connectEvm();
+        },
+
+        onReady: function (payload) {
+          console.log('atom-circuit ready', { protocolVersion: payload.protocolVersion });
+        },
+        onSwapSuccess: function (payload) {
+          console.log('atom-circuit swap success', { txHash: payload.txHash });
+        },
+        onError: function (error) {
+          console.log('atom-circuit sdk error', {
+            code: error.code,
+            message: error.message,
+            cause: error.cause,
+          });
+        },
+      });
+
+      document.getElementById('connect-cosmos').addEventListener('click', connectCosmos);
+      document.getElementById('connect-evm').addEventListener('click', connectEvm);
+    </script>
+  </body>
+</html>

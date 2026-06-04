@@ -8,22 +8,45 @@
  */
 
 import { mount, buildIframeSrc, SANDBOX_ATTR } from './mount.js';
-import { PROTOCOL_VERSION, WIDGET_ORIGIN } from './protocol.js';
+import {
+  PROTOCOL_VERSION,
+  WIDGET_ORIGIN,
+  WALLET_SIGNAL_NS,
+  EVM_BRIDGE_NS,
+} from './protocol.js';
+import {
+  fromCosmosKit,
+  fromInjectedCosmosWallet,
+  fromKeplr,
+  fromWagmi,
+} from './helpers.js';
 
 export interface AtomCircuitGlobal {
   readonly mount: typeof mount;
   readonly buildIframeSrc: typeof buildIframeSrc;
+  readonly fromInjectedCosmosWallet: typeof fromInjectedCosmosWallet;
+  readonly fromKeplr: typeof fromKeplr;
+  readonly fromCosmosKit: typeof fromCosmosKit;
+  readonly fromWagmi: typeof fromWagmi;
   readonly PROTOCOL_VERSION: string;
   readonly WIDGET_ORIGIN: string;
   readonly SANDBOX_ATTR: string;
+  readonly WALLET_SIGNAL_NS: string;
+  readonly EVM_BRIDGE_NS: string;
 }
 
 const api: AtomCircuitGlobal = Object.freeze({
   mount,
   buildIframeSrc,
+  fromInjectedCosmosWallet,
+  fromKeplr,
+  fromCosmosKit,
+  fromWagmi,
   PROTOCOL_VERSION,
   WIDGET_ORIGIN,
   SANDBOX_ATTR,
+  WALLET_SIGNAL_NS,
+  EVM_BRIDGE_NS,
 });
 
 if (typeof window !== 'undefined') {
@@ -40,4 +63,16 @@ if (typeof window !== 'undefined') {
 // which means consumers get `window.AtomCircuit.mount(...)` directly.
 // Avoid `export default` here so the IIFE namespace surface stays clean
 // (no `AtomCircuit.default` shim).
-export { mount, buildIframeSrc, PROTOCOL_VERSION, WIDGET_ORIGIN, SANDBOX_ATTR };
+export {
+  mount,
+  buildIframeSrc,
+  fromInjectedCosmosWallet,
+  fromKeplr,
+  fromCosmosKit,
+  fromWagmi,
+  PROTOCOL_VERSION,
+  WIDGET_ORIGIN,
+  SANDBOX_ATTR,
+  WALLET_SIGNAL_NS,
+  EVM_BRIDGE_NS,
+};

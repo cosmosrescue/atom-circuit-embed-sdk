@@ -10,3 +10,11 @@ coverage
 test-results
 playwright-report
 playwright/.cache
+
+# npm pack artifacts
+*.tgz
+
+# example app build output and lockfiles (examples resolve the SDK from the
+# published version; a local-install lockfile would pin a file: path)
+.next
+examples/**/package-lock.json

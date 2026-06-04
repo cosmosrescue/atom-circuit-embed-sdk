@@ -177,6 +177,91 @@ describe('mount() error reporting', () => {
     handle.destroy();
   });
 
+  it('classifies a MAJOR protocol mismatch with code protocol_incompatible', async () => {
+    // recordHandshake() rejects init() with a 'protocol mismatch (incompatible
+    // major)' message on a major-version mismatch; mount() must route that to
+    // onError with code protocol_incompatible (the documented contract).
+    vi.spyOn(IframeClient.prototype, 'init').mockRejectedValue(
+      new Error(
+        'Atom Circuit embed: protocol mismatch (incompatible major): sdk=1.0.0, iframe=2.0.0'
+      )
+    );
+    const onError = vi.fn<(e: MountError) => void>();
+
+    const handle = mount(container, {
+      referralId: 'val1',
+      onError,
+    });
+    await flushMicrotasks();
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    const arg = onError.mock.calls[0]?.[0];
+    expect(arg?.code).toBe('protocol_incompatible');
+    expect(arg?.message).toMatch(/protocol mismatch/);
+    handle.destroy();
+  });
+
+  it('surfaces protocol_incompatible even when a ready event already fired (bypasses the bridgeReady suppression)', async () => {
+    // A major-mismatch iframe may still emit a `ready` event over the raw
+    // stream, which would normally set bridgeReady and suppress the init
+    // rejection (treated as a benign Penpal asymmetry). protocol_incompatible
+    // is the exception: it MUST surface so the host can handle the bad
+    // bring-up. Emit ready through the live client, then reject init.
+    vi.spyOn(IframeClient.prototype, 'init').mockImplementation(function (
+      this: IframeClient
+    ) {
+      // Fire ready via the real raw-message path so mount's readySuppress
+      // handler sets bridgeReady = true before the rejection lands.
+      this._handleMessageForTest({
+        origin: 'https://atomcircuit.net',
+        source: (this as unknown as { iframe: HTMLIFrameElement }).iframe
+          .contentWindow,
+        data: { type: 'atomcircuit:event', name: 'ready', payload: {} },
+      } as unknown as MessageEvent);
+      return Promise.reject(
+        new Error(
+          'Atom Circuit embed: protocol mismatch (incompatible major): sdk=1.0.0, iframe=2.0.0'
+        )
+      );
+    });
+    const onReady = vi.fn();
+    const onError = vi.fn<(e: MountError) => void>();
+
+    const handle = mount(container, {
+      referralId: 'val1',
+      onReady,
+      onError,
+    });
+    await flushMicrotasks();
+
+    // ready fired (the iframe announced itself) AND the protocol error still
+    // surfaced - both are expected for a major mismatch.
+    expect(onReady).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0]?.[0].code).toBe('protocol_incompatible');
+    handle.destroy();
+  });
+
+  it('does NOT fire onError when init() resolves (minor/patch mismatch still mounts)', async () => {
+    // A minor/patch mismatch warns inside recordHandshake but resolves init();
+    // mount() must NOT surface an onError in that case (the embed mounts).
+    vi.spyOn(IframeClient.prototype, 'init').mockResolvedValue({
+      type: 'handshake',
+      protocolVersion: '1.7.4',
+      capabilities: [],
+    });
+    const onError = vi.fn<(e: MountError) => void>();
+
+    const handle = mount(container, {
+      referralId: 'val1',
+      onError,
+    });
+    await flushMicrotasks();
+
+    expect(onError).not.toHaveBeenCalled();
+    handle.destroy();
+  });
+
   it('does not fire onError after destroy() is called pre-timeout', async () => {
     vi.useFakeTimers();
     vi.spyOn(IframeClient.prototype, 'init').mockImplementation(

@@ -168,6 +168,49 @@ export interface ThemeOptions {
   readonly foreground?: string;
   /** Border color for inputs, cards, dividers. Hex only. */
   readonly border?: string;
+  /**
+   * Card / panel / input surface color (one step up from `background`). Maps to
+   * the dapp's --bg-card / --bg-secondary / --bg-input / --bg-deep plus a
+   * derived --bg-card-hover. Hex only. Absent => dapp defaults unchanged. The
+   * more specific `cardSecondary` and `input` tokens, when present, override
+   * the secondary/band and input tiers respectively (applied after this bundle
+   * so they win).
+   */
+  readonly card?: string;
+  /**
+   * Secondary surface tier color: the validator / picker band (--bg-deep) and
+   * the secondary panel (--bg-secondary). Overrides the `card` bundle's value
+   * for those two surfaces. Hex only. Absent => the `card` bundle (or the dapp
+   * default) keeps the band/secondary color unchanged.
+   */
+  readonly cardSecondary?: string;
+  /**
+   * Input surface color (text/amount inputs). Maps to the dapp's --bg-input,
+   * overriding the `card` bundle's input value. Hex only. Absent => the `card`
+   * bundle (or the dapp default) keeps the input color unchanged.
+   */
+  readonly input?: string;
+  /**
+   * Muted/secondary text color (labels, captions, helper text). Maps to the
+   * dapp's --text-secondary and --text-tertiary. Hex only.
+   */
+  readonly mutedForeground?: string;
+  /**
+   * Text/icon color rendered ON TOP of the accent color (e.g. primary-button
+   * label). Maps to the dapp's --accent-foreground. Hex only.
+   */
+  readonly accentForeground?: string;
+  /**
+   * Focused/secondary border color (focused inputs, emphasized dividers). Maps
+   * to the dapp's --border-secondary. Hex only.
+   */
+  readonly borderFocus?: string;
+  /** Warning notification color. Maps to the dapp's --warning. Hex only. */
+  readonly warning?: string;
+  /** Success notification color. Maps to the dapp's --success. Hex only. */
+  readonly success?: string;
+  /** Error notification color. Maps to the dapp's --error. Hex only. */
+  readonly error?: string;
   /** Corner radius in pixels. Range: 0-64 inclusive. */
   readonly radius?: number;
   /** Base font size in pixels. Range: 8-32 inclusive. */
@@ -205,6 +248,290 @@ export interface ChromeOptions {
 }
 
 /* ------------------------------------------------------------------------- */
+/* Parent-page wallet reuse (opt-in)                                          */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * Minimal EIP-1193 provider surface the EVM bridge relies on. The integrator's
+ * connected wallet (wagmi connector client, window.ethereum, etc.) satisfies
+ * this. `on` / `removeListener` are optional: when absent the bridge simply
+ * relays `request(...)` calls and forwards no push events.
+ */
+export interface Eip1193ProviderLike {
+  request(args: { method: string; params?: unknown[] | object }): Promise<unknown>;
+  on?(event: string, listener: (...args: unknown[]) => void): void;
+  removeListener?(event: string, listener: (...args: unknown[]) => void): void;
+}
+
+/**
+ * An offline signer object as returned by a connected Cosmos wallet. Kept
+ * structurally loose (the cosmiframe parent listener proxies whatever the
+ * integrator's wallet returns) so the SDK does not pull a hard dependency on
+ * @cosmjs typings into the public surface.
+ */
+export type OfflineSignerLike = Record<string, unknown>;
+
+/**
+ * The Cosmos half of {@link WalletOptions.cosmos}. Mirrors the cosmiframe
+ * `ListenOptions` subset the bridge passes through verbatim.
+ */
+export interface WalletCosmosHandle {
+  /**
+   * The integrator's connected wallet client object. Non-signer methods
+   * (getKey, enable, etc.) are proxied generically to this object by the
+   * cosmiframe parent listener.
+   */
+  readonly target: Record<string, unknown>;
+  /**
+   * Returns the direct (protobuf) offline signer for a chain id, from the
+   * integrator's connected wallet.
+   */
+  readonly getOfflineSignerDirect: (
+    chainId: string
+  ) => OfflineSignerLike | Promise<OfflineSignerLike>;
+  /**
+   * Returns the amino offline signer for a chain id, from the integrator's
+   * connected wallet.
+   */
+  readonly getOfflineSignerAmino: (
+    chainId: string
+  ) => OfflineSignerLike | Promise<OfflineSignerLike>;
+  /**
+   * Optional parent metadata (name + image) the iframe may display to tell the
+   * user which wallet they are signing with.
+   */
+  readonly metadata?: { readonly name?: string; readonly imageUrl?: string };
+}
+
+/**
+ * The EVM half of {@link WalletOptions.evm}. The bridge relays EIP-1193
+ * `request(...)` calls to this provider and forwards its push events.
+ */
+export interface WalletEvmHandle {
+  readonly provider: Eip1193ProviderLike;
+}
+
+/**
+ * Parent-page wallet reuse options. Opt-in and fully additive. `mode` is a
+ * required field: omit the entire `wallet` option to get the default in-iframe
+ * connect (byte-identical iframe URL and zero bridge wiring). Supplying `wallet`
+ * with `mode: 'iframe'` is equivalent to omitting it; set `mode: 'parent'` to
+ * reuse the parent page's already-connected wallet over the postMessage bridge.
+ *
+ * When `mode` is `'parent'`:
+ * - The embed trusts the page it is in by that page's own origin: the SDK
+ *   stamps its actual parent origin into the iframe URL and the dapp trusts that
+ *   single origin directly. The runtime bridge enforces per-message origin /
+ *   source checks on top of that.
+ * - At least one of `cosmos` / `evm` should be supplied; the loader wires up
+ *   only the side(s) present.
+ *
+ * See the SDK 2.0 wallet-reuse spec, sections 2-7.
+ */
+export interface WalletOptions {
+  /**
+   * Required explicit choice between in-iframe connect (`'iframe'`) and
+   * parent-page wallet reuse (`'parent'`). There is no default value for this
+   * field; to get the default in-iframe connect behaviour omit the entire
+   * `wallet` option rather than passing a value here.
+   */
+  readonly mode: 'iframe' | 'parent';
+  /** Cosmos wallet handle. When present, the Cosmos bridge is wired. */
+  readonly cosmos?: WalletCosmosHandle;
+  /** EVM wallet handle. When present, the EVM bridge is wired. */
+  readonly evm?: WalletEvmHandle;
+}
+
+/* ------------------------------------------------------------------------- */
+/* EVM bridge wire envelopes (Appendix A.3)                                   */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * Namespace tag carried by every EVM bridge message. Distinct from the event
+ * bridge's `handshake` / `atomcircuit:resize` / `atomcircuit:event` types so
+ * the two listeners never cross-trigger.
+ */
+export const EVM_BRIDGE_NS = 'atomcircuit:evm';
+
+/**
+ * Request envelope (iframe -> parent). `id` is a fresh unique string per
+ * request; the parent echoes it on the matching response.
+ */
+export interface EvmRequestMessage {
+  readonly ns: typeof EVM_BRIDGE_NS;
+  readonly kind: 'request';
+  readonly id: string;
+  readonly method: string;
+  readonly params?: unknown[];
+}
+
+/**
+ * Success response envelope (parent -> iframe).
+ */
+export interface EvmResponseSuccess {
+  readonly ns: typeof EVM_BRIDGE_NS;
+  readonly kind: 'response';
+  readonly id: string;
+  readonly result: unknown;
+}
+
+/**
+ * Error response envelope (parent -> iframe). `error.code` mirrors the
+ * provider's numeric JSON-RPC / EIP-1193 error code where available.
+ */
+export interface EvmResponseError {
+  readonly ns: typeof EVM_BRIDGE_NS;
+  readonly kind: 'response';
+  readonly id: string;
+  readonly error: { readonly code: number; readonly message: string };
+}
+
+export type EvmResponseMessage = EvmResponseSuccess | EvmResponseError;
+
+/**
+ * Provider push event envelopes (parent -> iframe). One per EIP-1193 event the
+ * bridge forwards.
+ */
+export type EvmEventMessage =
+  | {
+      readonly ns: typeof EVM_BRIDGE_NS;
+      readonly kind: 'event';
+      readonly event: 'accountsChanged';
+      readonly accounts: string[];
+    }
+  | {
+      readonly ns: typeof EVM_BRIDGE_NS;
+      readonly kind: 'event';
+      readonly event: 'chainChanged';
+      readonly chainId: string;
+    }
+  | {
+      readonly ns: typeof EVM_BRIDGE_NS;
+      readonly kind: 'event';
+      readonly event: 'disconnect';
+      /**
+       * The EIP-1193 `disconnect` event delivers a `ProviderRpcError`. When the
+       * provider supplies one it is forwarded here (normalized to `{ code,
+       * message }`); absent when the provider fired `disconnect` with no error
+       * argument. The iframe-side consumer may ignore it.
+       */
+      readonly error?: { readonly code: number; readonly message: string };
+    };
+
+/**
+ * Any message on the EVM bridge channel.
+ */
+export type EvmBridgeMessage =
+  | EvmRequestMessage
+  | EvmResponseMessage
+  | EvmEventMessage;
+
+/* ------------------------------------------------------------------------- */
+/* Wallet-ready signal envelopes (Appendix A.4)                               */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * Namespace tag carried by every wallet-ready/gone signal. Distinct from the
+ * EVM bridge namespace ({@link EVM_BRIDGE_NS}) and from the event bridge's
+ * `handshake` / `atomcircuit:resize` / `atomcircuit:event` types, so none of
+ * the listeners ever cross-trigger.
+ *
+ * The parent posts a {@link WalletReadyMessage} when wallet handles become
+ * available or change (at mount if provided, or via `setWallet` after the
+ * integrator connects later), and a {@link WalletGoneMessage} on teardown. The
+ * iframe auto-adopts / reverts off these signals (spec section 5.5, "option Y":
+ * widget always visible, adopts the moment the parent wallet connects).
+ */
+export const WALLET_SIGNAL_NS = 'atomcircuit:wallet';
+
+/**
+ * The wallet channels a signal refers to. Cosmos is bridged via cosmiframe;
+ * EVM via the {@link EVM_BRIDGE_NS} envelope relay.
+ */
+export type WalletChannel = 'cosmos' | 'evm';
+
+/**
+ * Iframe -> parent: posted once the iframe's wallet layer is initialized and
+ * listening. The parent replies with {@link CapabilitiesMessage}. This avoids
+ * the race where the parent advertises capabilities (or posts an initial
+ * `ready`) before the iframe's control-channel listener is attached. See spec
+ * Appendix A.4.
+ */
+export interface WalletHelloMessage {
+  readonly ns: typeof WALLET_SIGNAL_NS;
+  readonly kind: 'hello';
+}
+
+/**
+ * Iframe -> parent: posted when the user clicks Connect in parent mode for a
+ * channel that is not yet bridged. The parent invokes the integrator's
+ * `onWalletConnectRequest(channel)` so the integrator runs THEIR own connect
+ * flow for that channel; on success the integrator calls `setWallet`, which
+ * posts a {@link WalletReadyMessage} and the iframe adopts. See spec Appendix
+ * A.4 / A.5.
+ */
+export interface WalletConnectRequestMessage {
+  readonly ns: typeof WALLET_SIGNAL_NS;
+  readonly kind: 'connect-request';
+  readonly channel: WalletChannel;
+}
+
+/**
+ * Parent -> iframe: sent in reply to {@link WalletHelloMessage}. A channel in
+ * `canRequestConnect` is `true` iff the integrator registered an
+ * `onWalletConnectRequest` handler (the single per-channel handler can service
+ * both channels). This tells the iframe whether to show an actionable Connect
+ * button (true) or the passive prompt (false) for that channel. `connectPrompt`
+ * carries the integrator's optional passive-prompt text override (which the
+ * iframe cannot otherwise know - it lives in the parent's mount options). See
+ * spec Appendix A.4.
+ */
+export interface WalletCapabilitiesMessage {
+  readonly ns: typeof WALLET_SIGNAL_NS;
+  readonly kind: 'capabilities';
+  readonly canRequestConnect: {
+    readonly cosmos: boolean;
+    readonly evm: boolean;
+  };
+  readonly connectPrompt?: string;
+}
+
+/**
+ * Parent -> iframe: the named channel(s) are now bridged and available. On
+ * receipt the iframe AUTO-ADOPTS them with no picker (cosmos = programmatically
+ * connect the cosmiframe wallet; evm = wagmi-connect the postMessage parent
+ * connector). See spec Appendix A.4 / section 5.5.
+ */
+export interface WalletReadyMessage {
+  readonly ns: typeof WALLET_SIGNAL_NS;
+  readonly kind: 'ready';
+  readonly channels: readonly WalletChannel[];
+}
+
+/**
+ * Parent -> iframe: the named channel(s) are no longer bridged (the integrator
+ * disconnected or called `clearWallet`). On receipt the iframe disconnects the
+ * bridged wallet(s) and reverts to the in-iframe connect fallback.
+ */
+export interface WalletGoneMessage {
+  readonly ns: typeof WALLET_SIGNAL_NS;
+  readonly kind: 'gone';
+  readonly channels: readonly WalletChannel[];
+}
+
+/**
+ * Any message on the wallet-signal channel (control + ready/gone). Both
+ * directions share the {@link WALLET_SIGNAL_NS} namespace; the `kind`
+ * discriminates direction and intent.
+ */
+export type WalletSignalMessage =
+  | WalletHelloMessage
+  | WalletConnectRequestMessage
+  | WalletCapabilitiesMessage
+  | WalletReadyMessage
+  | WalletGoneMessage;
+
+/* ------------------------------------------------------------------------- */
 /* Mount options                                                              */
 /* ------------------------------------------------------------------------- */
 
@@ -230,6 +557,17 @@ export interface MountError {
   readonly message: string;
   readonly cause?: unknown;
 }
+
+/**
+ * A React-`CSSProperties`-compatible inline-style bag. Keys are CSS property
+ * names (camelCase); values are CSS strings (and numbers, for parity with
+ * React's `CSSProperties` so the same object literal type-checks against both
+ * the vanilla `MountOptions.style` and the React `style` prop). The vanilla
+ * `mount()` applies only string values; numeric values are ignored there. Kept
+ * as a structural alias so the SDK does not pull a hard `react` dependency into
+ * the vanilla surface while staying assignable from a React `CSSProperties`.
+ */
+export type CSSPropertiesLike = Record<string, string | number | undefined>;
 
 /**
  * Options accepted by both `mount(...)` (vanilla) and `<AtomCircuitSwap />`
@@ -265,14 +603,18 @@ export interface MountOptions {
    */
   minHeight?: string;
   /**
-   * Optional additional CSS class applied to the iframe element.
+   * Optional additional CSS class. In vanilla `mount()` this is applied to the
+   * IFRAME element. (The React `<AtomCircuitSwap />` `className` prop applies to
+   * the WRAPPER div instead.)
    */
   className?: string;
   /**
-   * Optional inline style merge. `height` and `width` are managed by the SDK
-   * and ignored if supplied.
+   * Optional inline style merge. In vanilla `mount()` these styles are applied
+   * to the IFRAME element. (The React `<AtomCircuitSwap />` `style` prop applies
+   * to the WRAPPER div instead.) `height` and `width` are managed by the SDK
+   * and ignored if supplied here.
    */
-  style?: Partial<CSSStyleDeclaration>;
+  style?: CSSPropertiesLike;
   /**
    * Fires once the iframe has loaded and the handshake completes.
    */
@@ -350,6 +692,38 @@ export interface MountOptions {
    * intuitively across browsers). Default `'0'` when omitted.
    */
   readonly padding?: string;
+  /**
+   * Optional parent-page wallet reuse. See {@link WalletOptions}. Omit this
+   * field entirely for the default in-iframe connect (byte-identical iframe URL
+   * and zero bridge wiring); supplying it with `wallet.mode: 'iframe'` is
+   * equivalent. Set `wallet.mode: 'parent'` to opt the embed into reusing the
+   * integrator's already-connected wallet over the postMessage bridge. `mode`
+   * is a required field of {@link WalletOptions} - there is no implicit default.
+   */
+  readonly wallet?: WalletOptions;
+  /**
+   * Parent-mode connect-prompt handler (spec Appendix A.4 / A.5). Invoked when
+   * the iframe user clicks Connect in parent mode for a channel that is not yet
+   * bridged. The integrator runs THEIR own connect flow for that channel and
+   * calls `setWallet` on success (which posts the `ready` signal so the iframe
+   * adopts the reused wallet). The single per-channel handler can service both
+   * channels; if a channel is unserviceable the integrator's callback may
+   * no-op.
+   *
+   * Presence drives the A.4 `capabilities` advert: when supplied, the iframe
+   * shows an actionable Connect button for both channels; when absent, the
+   * iframe shows the passive {@link MountOptions.connectPrompt} text and never
+   * an in-iframe picker. Only meaningful when `wallet.mode === 'parent'`.
+   */
+  readonly onWalletConnectRequest?: (channel: WalletChannel) => void;
+  /**
+   * Override text for the passive not-connected prompt shown in the iframe when
+   * no {@link MountOptions.onWalletConnectRequest} handler exists (spec Appendix
+   * A.4 / A.5). Forwarded to the iframe in the `capabilities` reply. When
+   * omitted the iframe falls back to its own friendly generic default. Only
+   * meaningful when `wallet.mode === 'parent'`.
+   */
+  readonly connectPrompt?: string;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -392,6 +766,124 @@ export function isWidgetEventMessage(
   if (value['type'] !== 'atomcircuit:event') return false;
   if (!isString(value['name'])) return false;
   return WIDGET_EVENT_NAMES.has(value['name'] as WidgetEventName);
+}
+
+/**
+ * Runtime guard for an inbound EVM request envelope (the only EVM message the
+ * parent ever RECEIVES). Strict: rejects anything not carrying the exact
+ * namespace, kind, a string id, and a string method. `params`, when present,
+ * must be an array. This guard is the wire-shape half of the bridge's defense;
+ * the origin + source checks are the transport half (see wallet-bridge.ts).
+ */
+export function isEvmRequestMessage(value: unknown): value is EvmRequestMessage {
+  if (!isObject(value)) return false;
+  if (value['ns'] !== EVM_BRIDGE_NS) return false;
+  if (value['kind'] !== 'request') return false;
+  if (!isString(value['id'])) return false;
+  if (!isString(value['method'])) return false;
+  if (value['params'] !== undefined && !Array.isArray(value['params'])) {
+    return false;
+  }
+  return true;
+}
+
+const WALLET_CHANNELS: ReadonlySet<WalletChannel> = new Set(['cosmos', 'evm']);
+
+/**
+ * Runtime guard for an inbound wallet-ready signal. Strict: the namespace must
+ * match exactly, `kind` must be `'ready'`, and `channels` must be a non-empty
+ * array of known channel names (`'cosmos'` / `'evm'`). The iframe uses this as
+ * the wire-shape half of its defense; the origin + source checks are the
+ * transport half. Distinct namespace from the EVM bridge so the two listeners
+ * never cross-trigger.
+ */
+export function isWalletReadyMessage(value: unknown): value is WalletReadyMessage {
+  if (!isObject(value)) return false;
+  if (value['ns'] !== WALLET_SIGNAL_NS) return false;
+  if (value['kind'] !== 'ready') return false;
+  return isWalletChannelArray(value['channels']);
+}
+
+/**
+ * Runtime guard for an inbound wallet-gone signal. Mirror of
+ * {@link isWalletReadyMessage} with `kind === 'gone'`.
+ */
+export function isWalletGoneMessage(value: unknown): value is WalletGoneMessage {
+  if (!isObject(value)) return false;
+  if (value['ns'] !== WALLET_SIGNAL_NS) return false;
+  if (value['kind'] !== 'gone') return false;
+  return isWalletChannelArray(value['channels']);
+}
+
+/**
+ * Runtime guard for an inbound `hello` (iframe -> parent). The parent uses this
+ * as the wire-shape half of its defense; the origin + source checks are the
+ * transport half (see wallet-bridge.ts).
+ */
+export function isWalletHelloMessage(value: unknown): value is WalletHelloMessage {
+  if (!isObject(value)) return false;
+  if (value['ns'] !== WALLET_SIGNAL_NS) return false;
+  return value['kind'] === 'hello';
+}
+
+/**
+ * Runtime guard for an inbound `connect-request` (iframe -> parent). Strict:
+ * the namespace must match, `kind` must be `'connect-request'`, and `channel`
+ * must be a single known channel name.
+ */
+export function isWalletConnectRequestMessage(
+  value: unknown
+): value is WalletConnectRequestMessage {
+  if (!isObject(value)) return false;
+  if (value['ns'] !== WALLET_SIGNAL_NS) return false;
+  if (value['kind'] !== 'connect-request') return false;
+  return isString(value['channel']) && WALLET_CHANNELS.has(value['channel'] as WalletChannel);
+}
+
+/**
+ * Runtime guard for an inbound `capabilities` reply (parent -> iframe). The
+ * iframe uses this as the wire-shape half of its defense. Strict:
+ * `canRequestConnect` must carry boolean `cosmos` + `evm`, and `connectPrompt`,
+ * when present, must be a string.
+ */
+export function isWalletCapabilitiesMessage(
+  value: unknown
+): value is WalletCapabilitiesMessage {
+  if (!isObject(value)) return false;
+  if (value['ns'] !== WALLET_SIGNAL_NS) return false;
+  if (value['kind'] !== 'capabilities') return false;
+  const can = value['canRequestConnect'];
+  if (!isObject(can)) return false;
+  if (typeof can['cosmos'] !== 'boolean') return false;
+  if (typeof can['evm'] !== 'boolean') return false;
+  if (value['connectPrompt'] !== undefined && !isString(value['connectPrompt'])) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Runtime guard for any wallet-signal message (hello / connect-request /
+ * capabilities / ready / gone).
+ */
+export function isWalletSignalMessage(value: unknown): value is WalletSignalMessage {
+  return (
+    isWalletHelloMessage(value) ||
+    isWalletConnectRequestMessage(value) ||
+    isWalletCapabilitiesMessage(value) ||
+    isWalletReadyMessage(value) ||
+    isWalletGoneMessage(value)
+  );
+}
+
+/** A non-empty array of known wallet channel names, no duplicates required. */
+function isWalletChannelArray(value: unknown): value is readonly WalletChannel[] {
+  if (!Array.isArray(value)) return false;
+  if (value.length === 0) return false;
+  return value.every(
+    (entry): entry is WalletChannel =>
+      isString(entry) && WALLET_CHANNELS.has(entry as WalletChannel)
+  );
 }
 
 export function isProtocolMessage(value: unknown): value is ProtocolMessage {

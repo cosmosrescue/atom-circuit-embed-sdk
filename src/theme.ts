@@ -96,6 +96,51 @@ export function validateTheme(theme: unknown): ThemeOptions | null {
     out.border = theme['border'];
   }
 
+  if (theme['card'] !== undefined) {
+    if (!isHexColor(theme['card'])) return null;
+    out.card = theme['card'];
+  }
+
+  if (theme['cardSecondary'] !== undefined) {
+    if (!isHexColor(theme['cardSecondary'])) return null;
+    out.cardSecondary = theme['cardSecondary'];
+  }
+
+  if (theme['input'] !== undefined) {
+    if (!isHexColor(theme['input'])) return null;
+    out.input = theme['input'];
+  }
+
+  if (theme['mutedForeground'] !== undefined) {
+    if (!isHexColor(theme['mutedForeground'])) return null;
+    out.mutedForeground = theme['mutedForeground'];
+  }
+
+  if (theme['accentForeground'] !== undefined) {
+    if (!isHexColor(theme['accentForeground'])) return null;
+    out.accentForeground = theme['accentForeground'];
+  }
+
+  if (theme['borderFocus'] !== undefined) {
+    if (!isHexColor(theme['borderFocus'])) return null;
+    out.borderFocus = theme['borderFocus'];
+  }
+
+  if (theme['warning'] !== undefined) {
+    if (!isHexColor(theme['warning'])) return null;
+    out.warning = theme['warning'];
+  }
+
+  if (theme['success'] !== undefined) {
+    if (!isHexColor(theme['success'])) return null;
+    out.success = theme['success'];
+  }
+
+  if (theme['error'] !== undefined) {
+    if (!isHexColor(theme['error'])) return null;
+    out.error = theme['error'];
+  }
+
   if (theme['radius'] !== undefined) {
     const r = theme['radius'];
     if (!isFiniteNumber(r) || r < 0 || r > 64) return null;

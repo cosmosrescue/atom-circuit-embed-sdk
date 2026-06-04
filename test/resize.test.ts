@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import { IframeClient } from '../src/iframe-client.js';
-import { attachResize, RESIZE_DEFAULT_MIN_HEIGHT } from '../src/resize.js';
+import { attachResize, RESIZE_DEFAULT_MIN_HEIGHT, RESIZE_MAX_HEIGHT_PX } from '../src/resize.js';
 import { WIDGET_ORIGIN } from '../src/protocol.js';
 
 /**
@@ -82,6 +82,19 @@ describe('attachResize', () => {
     iframe.style.height = '999px';
     dispatchResize(client, remoteWindow, 720);
     expect(iframe.style.height).toBe('999px');
+  });
+
+  it('clamps a bogus oversized height to the configured maximum', () => {
+    attachResize({ iframe, client });
+    dispatchResize(client, remoteWindow, 9_999_999);
+    expect(iframe.style.height).toBe(`${RESIZE_MAX_HEIGHT_PX}px`);
+  });
+
+  it('applies a height just under the maximum verbatim (max clamp does not over-clamp)', () => {
+    attachResize({ iframe, client });
+    const justUnder = RESIZE_MAX_HEIGHT_PX - 1;
+    dispatchResize(client, remoteWindow, justUnder);
+    expect(iframe.style.height).toBe(`${justUnder}px`);
   });
 
   it('handles successive different heights', () => {

@@ -11,9 +11,6 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './test/e2e',
   testMatch: /.*\.spec\.ts$/,
-  // The cross-origin handshake test exercises real timers + network; allow
-  // a generous default per-test timeout but keep it bounded so a hung
-  // browser does not stall CI.
   timeout: 30_000,
   expect: {
     timeout: 10_000,

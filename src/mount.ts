@@ -9,6 +9,7 @@ import {
   PROTOCOL_VERSION,
   WIDGET_ORIGIN,
   WIDGET_PATH,
+  type CSSPropertiesLike,
   type MountError,
   type MountErrorCode,
   type MountOptions,
@@ -16,7 +17,16 @@ import {
   type SwapErrorPayload,
   type SwapSubmittedPayload,
   type SwapSuccessPayload,
+  type WalletChannel,
+  type WalletCosmosHandle,
+  type WalletEvmHandle,
+  type WalletOptions,
 } from './protocol.js';
+import {
+  createWalletBridge,
+  resolveWidgetOrigin,
+  type WalletBridgeController,
+} from './wallet-bridge.js';
 import {
   encodeTheme,
   validateAllowReferralChoice,
@@ -40,7 +50,7 @@ const HANDSHAKE_TIMEOUT_MS = 15_000;
  *   - allow-scripts: widget needs JS.
  *   - allow-same-origin: required so Keplr can inject window.keplr.
  *   - allow-popups + allow-popups-to-escape-sandbox: wallet popups (Keplr,
- *     Leap, Cosmostation), tx success links.
+ *     Cosmostation), tx success links.
  *   - allow-forms: in case future widget revs add a form-based on-ramp.
  *
  * Deliberately omitted: `allow-top-navigation` (clickjacking risk).
@@ -79,12 +89,35 @@ export interface MountResult {
    */
   wrapper: HTMLDivElement;
   client: IframeClient;
+  /**
+   * Supply or replace parent-page wallet handles AFTER mount (spec A.5). The
+   * common flow: mount the widget immediately (always visible), then call
+   * `setWallet` once the integrator's wallet connects. (Re)wires the parent
+   * bridge for the provided channel(s) and posts the A.4 `ready` signal so the
+   * iframe auto-adopts the reused wallet with no remount. Calling it again with
+   * a fresh handle re-adopts cleanly (replace semantics per channel).
+   *
+   * No-op unless the embed was mounted with `wallet.mode === 'parent'` (the
+   * URL must already carry `walletMode=parent` for the iframe to accept the
+   * bridge). In mode `'iframe'` / absent there is no bridge to wire.
+   */
+  setWallet(handles: {
+    cosmos?: WalletCosmosHandle;
+    evm?: WalletEvmHandle;
+  }): void;
+  /**
+   * Tear down the given parent-wallet channel(s) (or all when omitted) and post
+   * the A.4 `gone` signal so the iframe reverts to the in-iframe connect
+   * fallback. Used when the integrator's user disconnects on the parent page.
+   * No-op when no bridge channel is wired.
+   */
+  clearWallet(channels?: readonly WalletChannel[]): void;
   destroy(): void;
 }
 
 type BuildSrcOpts = Pick<
   MountOptions,
-  'origin' | 'path' | 'theme' | 'chrome' | 'allowReferralChoice'
+  'origin' | 'path' | 'theme' | 'chrome' | 'allowReferralChoice' | 'wallet'
 > & {
   /** Resolved referralId. mount() defaults undefined/empty to 'general'
    * before calling buildSrc, so this is always a non-empty string here. */
@@ -143,6 +176,30 @@ function buildSrc(opts: BuildSrcOpts): string {
     );
   }
 
+  // Parent-page wallet reuse signal (spec Appendix A.1). Present ONLY when the
+  // host explicitly opts into mode 'parent'. Absent / 'iframe' => no params, so
+  // the URL stays byte-identical to the pre-feature output (invariant #1).
+  if (opts.wallet?.mode === 'parent') {
+    params.set('walletMode', 'parent');
+    // Parent mode trusts the embedding page by its own origin. The SDK runs in
+    // the embedder's page, so the embedder's real origin is available here as
+    // globalThis.location.origin. We stamp it as parentOrigin and the dapp
+    // trusts it as the single allowed parent origin. This is safe because the
+    // runtime bridge still checks event.origin / event.source on every message
+    // against the widget origin; a forged parentOrigin simply produces a bridge
+    // that no real parent can satisfy, so it fails closed.
+    //
+    // Only stamp a usable concrete origin. In a browser document the value is
+    // always a real "https://host[:port]" string; the literal 'null' appears
+    // for opaque/sandboxed origins and must never be trusted. Under SSR or any
+    // environment without a location we set nothing (no throw), which leaves the
+    // dapp on the in-iframe connect fallback.
+    const origin = globalThis.location?.origin;
+    if (typeof origin === 'string' && origin.length > 0 && origin !== 'null') {
+      params.set('parentOrigin', origin);
+    }
+  }
+
   const sep = path.includes('?') ? '&' : '?';
   return `${origin}${path}${sep}${params.toString()}`;
 }
@@ -156,14 +213,18 @@ function buildSrc(opts: BuildSrcOpts): string {
  * `style.width` are silently filtered to keep behaviour predictable when
  * both are supplied.
  */
-function applyStyle(iframe: HTMLIFrameElement, style: Partial<CSSStyleDeclaration> | undefined): void {
+function applyStyle(iframe: HTMLIFrameElement, style: CSSPropertiesLike | undefined): void {
   if (!style) return;
-  for (const key of Object.keys(style) as Array<keyof CSSStyleDeclaration>) {
+  for (const key of Object.keys(style)) {
     if (key === 'height' || key === 'width') continue;
     const value = style[key];
+    // Only string values are applied. Numeric values (valid in React's
+    // CSSProperties, e.g. zIndex: 1) are skipped on the vanilla path because
+    // the iframe style setter expects CSS strings; integrators on the vanilla
+    // surface should pass CSS strings.
     if (typeof value === 'string') {
       // CSSStyleDeclaration is a string-indexed setter; assignment is safe.
-      (iframe.style as unknown as Record<string, string>)[key as string] = value;
+      (iframe.style as unknown as Record<string, string>)[key] = value;
     }
   }
 }
@@ -264,6 +325,7 @@ export function mount(container: HTMLElement, opts: MountOptions = {}): MountRes
     ...(opts.allowReferralChoice !== undefined
       ? { allowReferralChoice: opts.allowReferralChoice }
       : {}),
+    ...(opts.wallet !== undefined ? { wallet: opts.wallet } : {}),
     warn: warnSink,
   });
   iframe.setAttribute('sandbox', SANDBOX_ATTR);
@@ -391,6 +453,45 @@ export function mount(container: HTMLElement, opts: MountOptions = {}): MountRes
     allowedOrigin: opts.origin ?? WIDGET_ORIGIN,
   });
 
+  // Parent-page wallet bridge. The controller is created ONLY when the host
+  // explicitly opts into mode 'parent'. In mode 'iframe' (or absent) it stays
+  // null so the embed behaves exactly as today (invariant #1) and setWallet /
+  // clearWallet are no-ops. The bridge resolves the widget origin from the same
+  // origin surface the iframe src uses (opts.origin ?? WIDGET_ORIGIN), so a
+  // custom test/staging origin is honored consistently across the src and the
+  // bridge's origin/source checks.
+  //
+  // When handles are supplied at mount, they are wired immediately (equivalent
+  // to mount + immediate setWallet, spec A.5). When mode is 'parent' but NO
+  // handles are supplied yet (option Y: widget visible before connect), the
+  // controller is still created and the iframe URL still carries
+  // walletMode=parent&parentOrigin, so the integrator can call setWallet later
+  // to wire the bridge with no remount.
+  let walletBridge: WalletBridgeController | null = null;
+  const walletOpts: WalletOptions | undefined = opts.wallet;
+  if (walletOpts?.mode === 'parent') {
+    walletBridge = createWalletBridge({
+      iframe,
+      widgetOrigin: resolveWidgetOrigin(opts.origin ?? WIDGET_ORIGIN),
+      // Connect-prompt layer (spec A.4 / A.5). Presence of the handler drives
+      // the iframe's actionable-vs-passive Connect UI via the capabilities
+      // advert; connectPrompt overrides the passive prompt text.
+      ...(opts.onWalletConnectRequest
+        ? { onWalletConnectRequest: opts.onWalletConnectRequest }
+        : {}),
+      ...(opts.connectPrompt !== undefined
+        ? { connectPrompt: opts.connectPrompt }
+        : {}),
+      warn: warnSink,
+    });
+    if (walletOpts.cosmos || walletOpts.evm) {
+      walletBridge.setWallet({
+        ...(walletOpts.cosmos ? { cosmos: walletOpts.cosmos } : {}),
+        ...(walletOpts.evm ? { evm: walletOpts.evm } : {}),
+      });
+    }
+  }
+
   const resize: ResizeHandle = attachResize({
     iframe,
     client,
@@ -456,18 +557,21 @@ export function mount(container: HTMLElement, opts: MountOptions = {}): MountRes
     })
     .catch((err: unknown) => {
       clearTimer();
+      const message = err instanceof Error ? err.message : String(err);
+      const code: MountErrorCode = classifyInitError(message);
       // Suppress: the iframe already announced readiness via the event
       // stream, so the apparent init failure is a Penpal asymmetry, not a
-      // real bridge failure.
-      if (bridgeReady) return;
+      // real bridge failure. EXCEPTION: a protocol-incompatible handshake
+      // (major-version mismatch) must always surface even though the iframe
+      // may still have emitted a `ready` event - it is a genuine bring-up
+      // failure the host needs to handle, not a transport asymmetry.
+      if (bridgeReady && code !== 'protocol_incompatible') return;
       // Suppress: the host already destroyed this mount (e.g. React
       // StrictMode double-effect in dev). The pending init() promise will
       // still reject when its underlying timeout fires, but there is no
       // consumer to surface the error to and emitting it would log a
       // spurious handshake_failed against the unmounted instance.
       if (destroyed) return;
-      const message = err instanceof Error ? err.message : String(err);
-      const code: MountErrorCode = classifyInitError(message);
       reportError({ code, message, cause: err });
     });
 
@@ -484,6 +588,12 @@ export function mount(container: HTMLElement, opts: MountOptions = {}): MountRes
     for (const unsub of subscriptions) unsub();
     resize.destroy();
     client.destroy();
+    // Tear down the wallet bridge (cosmiframe unlisten + EVM message listener
+    // + provider event subscriptions) so unmount leaves no leaked listeners.
+    if (walletBridge) {
+      walletBridge.teardown();
+      walletBridge = null;
+    }
     // Clear the loader's pending fade-out timer side-effect if it has not
     // yet fired. Idempotent because dismissLoader gates on a sentinel.
     dismissLoader();
@@ -497,7 +607,18 @@ export function mount(container: HTMLElement, opts: MountOptions = {}): MountRes
     }
   };
 
-  return { iframe, wrapper, client, destroy };
+  // Post-mount wallet handoff (spec A.5). No-op when the embed was not mounted
+  // in mode 'parent' (no controller exists) or after destroy().
+  const setWallet: MountResult['setWallet'] = (handles) => {
+    if (destroyed || !walletBridge) return;
+    walletBridge.setWallet(handles);
+  };
+  const clearWallet: MountResult['clearWallet'] = (channels) => {
+    if (destroyed || !walletBridge) return;
+    walletBridge.clearWallet(channels);
+  };
+
+  return { iframe, wrapper, client, setWallet, clearWallet, destroy };
 }
 
 /**
@@ -535,7 +656,13 @@ function classifyInitError(message: string): MountErrorCode {
 export function buildIframeSrc(
   opts: Pick<
     MountOptions,
-    'referralId' | 'origin' | 'path' | 'theme' | 'chrome' | 'allowReferralChoice'
+    | 'referralId'
+    | 'origin'
+    | 'path'
+    | 'theme'
+    | 'chrome'
+    | 'allowReferralChoice'
+    | 'wallet'
   > & {
     readonly warn?: (message: string) => void;
   }

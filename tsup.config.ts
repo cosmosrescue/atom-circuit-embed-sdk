@@ -77,11 +77,23 @@ export default defineConfig([
     entry: { 'atom-circuit': 'src/vanilla.ts' },
     format: ['iife'],
     globalName: 'AtomCircuit',
+    // Scope `platform: 'browser'` to THIS (CDN single-file) build only. The
+    // ESM/CJS/React targets above stay on tsup's default platform so they
+    // externalize for consumer bundlers. Here we bundle everything into one
+    // self-contained <script>, so esbuild must apply the package `browser`
+    // export condition: that makes @dao-dao/cosmiframe's transitive `uuid`
+    // resolve to its esm-browser entry (Web Crypto `crypto.getRandomValues`)
+    // instead of the node entry (`import crypto from 'crypto'`). Without this,
+    // tsup externalized the bare node `crypto` to a guessed global (`hn`) that
+    // does not exist in a browser, so the bundle self-invoked as `})({}, hn)`
+    // and threw `ReferenceError: hn is not defined` before window.AtomCircuit
+    // was ever assigned, breaking every <script>-tag integrator.
+    platform: 'browser',
     dts: false,
     // External `.map` rather than inline. Inline source maps would inflate
     // the runtime payload to ~60 KB gzipped, which blows the size budget;
     // shipping the map as a separate file keeps the executed bytes small
-    // and still lets operators debug against the bundled source.
+    // and still lets maintainers debug against the bundled source.
     sourcemap: true,
     clean: false,
     target: 'es2020',

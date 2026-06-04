@@ -36,14 +36,20 @@ That sequence produces:
 
 ## Examples
 
-The `examples/` directory contains ready-to-run integrations:
+The `examples/` directory contains ready-to-run integrations, organized by
+language and framework. Each app carries the `minimal`, `full`, `parent-wallet`,
+and `parent-wallet-cosmoskit` examples (the full example exercises theming,
+`allowReferralChoice`, and every lifecycle callback; the parent-wallet examples
+exercise parent-page wallet reuse over Cosmos and EVM):
 
-- `examples/vanilla-html` - drop the IIFE into a static page.
-- `examples/react` - minimal React app.
-- `examples/nextjs` - SSR-safe Next.js usage via `next/dynamic`.
+- `examples/typescript/react`, `examples/javascript/react` - React (Vite).
+- `examples/typescript/nextjs`, `examples/javascript/nextjs` - SSR-safe Next.js
+  App Router usage via `next/dynamic`.
+- `examples/vanilla` - drop the IIFE into a static page (`minimal.html`,
+  `full.html`, `parent-wallet.html`); no build step.
 
-After `npm run build`, you can serve `examples/vanilla-html/index.html`
-with any static file server pointing at the repo root.
+After `npm run build`, you can serve `examples/vanilla/full.html` with any static
+file server pointing at the repo root.
 
 ## Code style
 
@@ -71,7 +77,7 @@ with any static file server pointing at the repo root.
 ## Cutting a release
 
 The release workflow (`.github/workflows/release.yml`) publishes to npm
-with provenance when a `v*` tag is pushed. Steps for the operator:
+with provenance when a `v*` tag is pushed. Steps for the maintainer:
 
 1. Bump `version` in `package.json` and update `CHANGELOG.md`.
 2. Commit, then tag with the new version: `git tag vX.Y.Z && git push origin vX.Y.Z`.

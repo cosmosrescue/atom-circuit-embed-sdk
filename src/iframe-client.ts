@@ -121,7 +121,18 @@ export class IframeClient {
   private rawListener: ((event: MessageEvent) => void) | null = null;
   private destroyed = false;
   private handshakeReceived: HandshakeMessage | null = null;
-  private handshakeResolvers: Array<(value: HandshakeMessage) => void> = [];
+  /**
+   * Set when a handshake arrived whose MAJOR protocol version is incompatible
+   * with the SDK's. `init()` rejects with this so the host's `onError` fires
+   * with code `protocol_incompatible` (a major mismatch means the iframe may
+   * speak a wire shape the SDK cannot drive safely). A MINOR/PATCH mismatch
+   * only warns and still resolves (the embed mounts).
+   */
+  private handshakeIncompatible: Error | null = null;
+  private handshakeResolvers: Array<{
+    resolve: (value: HandshakeMessage) => void;
+    reject: (reason: Error) => void;
+  }> = [];
 
   private readonly handlers: {
     [K in EventName]: Set<EventHandlers[K]>;
@@ -295,33 +306,68 @@ export class IframeClient {
 
   private recordHandshake(payload: HandshakeMessage): void {
     this.handshakeReceived = payload;
+    const resolvers = this.handshakeResolvers;
+    this.handshakeResolvers = [];
+
     if (!isCompatibleProtocol(PROTOCOL_VERSION, payload.protocolVersion)) {
+      // MAJOR mismatch: the iframe and SDK disagree on the wire-protocol major,
+      // so the SDK cannot safely drive the iframe. Surface this to the host by
+      // rejecting init(); mount() classifies the message as
+      // 'protocol_incompatible' and routes it to onError. The message must
+      // contain 'protocol mismatch' (and must NOT contain 'handshake' or
+      // 'timeout', which classifyInitError checks first).
+      const error = new Error(
+        `Atom Circuit embed: protocol mismatch (incompatible major): sdk=${PROTOCOL_VERSION}, iframe=${payload.protocolVersion}`
+      );
+      this.handshakeIncompatible = error;
+      for (const { reject } of resolvers) {
+        reject(error);
+      }
+      return;
+    }
+
+    if (payload.protocolVersion !== PROTOCOL_VERSION) {
+      // MINOR/PATCH mismatch (same major): the wire shape is compatible, so the
+      // embed still mounts. Warn so the host can log the drift, then resolve.
       this.warn(
         `Atom Circuit embed: protocol mismatch (sdk=${PROTOCOL_VERSION}, iframe=${payload.protocolVersion}). Some features may be unavailable.`
       );
     }
-    const resolvers = this.handshakeResolvers;
-    this.handshakeResolvers = [];
-    for (const resolve of resolvers) {
+
+    for (const { resolve } of resolvers) {
       resolve(payload);
     }
   }
 
   private waitForHandshake(): Promise<HandshakeMessage> {
+    // A handshake may already have arrived through the raw postMessage path
+    // before init()'s connection.promise resolved. If it was MAJOR-incompatible
+    // we recorded the rejection reason; reject now so the host's onError fires
+    // with 'protocol_incompatible' instead of resolving against a mismatched
+    // iframe.
+    if (this.handshakeIncompatible) {
+      return Promise.reject(this.handshakeIncompatible);
+    }
     if (this.handshakeReceived) {
       return Promise.resolve(this.handshakeReceived);
     }
     return new Promise<HandshakeMessage>((resolve, reject) => {
       const timer = setTimeout(() => {
-        const idx = this.handshakeResolvers.indexOf(wrapped);
+        const idx = this.handshakeResolvers.indexOf(entry);
         if (idx >= 0) this.handshakeResolvers.splice(idx, 1);
         reject(new Error('IframeClient: handshake timeout'));
       }, this.timeoutMs);
-      const wrapped = (value: HandshakeMessage): void => {
-        clearTimeout(timer);
-        resolve(value);
+      const entry = {
+        resolve: (value: HandshakeMessage): void => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        reject: (reason: Error): void => {
+          clearTimeout(timer);
+          reject(reason);
+        },
       };
-      this.handshakeResolvers.push(wrapped);
+      this.handshakeResolvers.push(entry);
     });
   }
 

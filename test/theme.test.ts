@@ -162,6 +162,67 @@ describe('validateTheme', () => {
       expect(out).toBeNull();
     });
   });
+
+  describe('new theme tokens (spec 5.7.2)', () => {
+    const newTokens = [
+      'card',
+      'cardSecondary',
+      'input',
+      'mutedForeground',
+      'accentForeground',
+      'borderFocus',
+      'warning',
+      'success',
+      'error',
+    ] as const;
+
+    for (const token of newTokens) {
+      it(`accepts a valid 6-digit hex for ${token}`, () => {
+        expect(validateTheme({ [token]: '#123abc' })).toEqual({ [token]: '#123abc' });
+      });
+
+      it(`accepts a valid 3-digit hex for ${token}`, () => {
+        expect(validateTheme({ [token]: '#fff' })).toEqual({ [token]: '#fff' });
+      });
+
+      it(`rejects an invalid value for ${token} (drops whole theme)`, () => {
+        expect(validateTheme({ [token]: 'red' })).toBeNull();
+        expect(validateTheme({ [token]: '#xyz' })).toBeNull();
+        expect(validateTheme({ [token]: 'rgb(0,0,0)' })).toBeNull();
+        expect(validateTheme({ [token]: '#1234' })).toBeNull();
+        expect(validateTheme({ [token]: 42 })).toBeNull();
+      });
+
+      it(`leaves ${token} undefined when absent`, () => {
+        const out = validateTheme({ mode: 'dark' }) as Record<string, unknown>;
+        expect(out).not.toBeNull();
+        expect(out[token]).toBeUndefined();
+      });
+    }
+
+    it('accepts a theme using ALL new tokens alongside the old ones', () => {
+      const input: ThemeOptions = {
+        mode: 'dark',
+        accentColor: '#7b61ff',
+        background: '#0d0f14',
+        foreground: '#f5f6fa',
+        border: '#1f2330',
+        card: '#161a24',
+        cardSecondary: '#11141d',
+        input: '#1b2030',
+        mutedForeground: '#9aa3b5',
+        accentForeground: '#ffffff',
+        borderFocus: '#3b4663',
+        warning: '#ffaa00',
+        success: '#22cc88',
+        error: '#ff3355',
+        radius: 12,
+        fontSize: 14,
+        fontFamily: 'Inter, sans-serif',
+      };
+      expect(validateTheme(input)).toEqual(input);
+    });
+  });
 });
 
 describe('encodeTheme', () => {
@@ -224,6 +285,42 @@ describe('encodeTheme', () => {
   it('returns deterministic output for the same input', () => {
     const theme: ThemeOptions = { mode: 'dark', radius: 8 };
     expect(encodeTheme(theme)).toBe(encodeTheme(theme));
+  });
+
+  it('round-trips all new theme tokens (spec 5.7.2)', () => {
+    const theme: ThemeOptions = {
+      mode: 'dark',
+      accentColor: '#7b61ff',
+      card: '#161a24',
+      cardSecondary: '#11141d',
+      input: '#1b2030',
+      mutedForeground: '#9aa3b5',
+      accentForeground: '#ffffff',
+      borderFocus: '#3b4663',
+      warning: '#ffaa00',
+      success: '#22cc88',
+      error: '#ff3355',
+    };
+    const parsed = JSON.parse(decode(encodeTheme(theme)));
+    expect(parsed).toEqual(theme);
+  });
+
+  it('omits new tokens from the blob when absent (back-compat byte-identical)', () => {
+    const theme: ThemeOptions = { mode: 'dark', accentColor: '#abc' };
+    const parsed = JSON.parse(decode(encodeTheme(theme))) as Record<string, unknown>;
+    for (const token of [
+      'card',
+      'cardSecondary',
+      'input',
+      'mutedForeground',
+      'accentForeground',
+      'borderFocus',
+      'warning',
+      'success',
+      'error',
+    ]) {
+      expect(parsed).not.toHaveProperty(token);
+    }
   });
 });
 

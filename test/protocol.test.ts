@@ -5,7 +5,14 @@ import {
   isResizeMessage,
   isWidgetEventMessage,
   isProtocolMessage,
+  isEvmRequestMessage,
+  isWalletHelloMessage,
+  isWalletConnectRequestMessage,
+  isWalletCapabilitiesMessage,
+  isWalletSignalMessage,
   isCompatibleProtocol,
+  EVM_BRIDGE_NS,
+  WALLET_SIGNAL_NS,
   PROTOCOL_VERSION,
   WIDGET_ORIGIN,
   WIDGET_PATH,
@@ -137,6 +144,180 @@ describe('protocol', () => {
     });
     it('rejects malformed versions', () => {
       expect(isCompatibleProtocol('', '1.0.0')).toBe(false);
+    });
+  });
+
+  describe('isEvmRequestMessage', () => {
+    it('accepts a well-formed request envelope with and without params', () => {
+      expect(
+        isEvmRequestMessage({
+          ns: EVM_BRIDGE_NS,
+          kind: 'request',
+          id: 'r1',
+          method: 'eth_chainId',
+          params: [],
+        })
+      ).toBe(true);
+      expect(
+        isEvmRequestMessage({
+          ns: EVM_BRIDGE_NS,
+          kind: 'request',
+          id: 'r1',
+          method: 'eth_accounts',
+        })
+      ).toBe(true);
+    });
+
+    it('rejects wrong ns, wrong kind, missing/typed-wrong fields, and non-array params', () => {
+      expect(isEvmRequestMessage(null)).toBe(false);
+      expect(isEvmRequestMessage('x')).toBe(false);
+      expect(
+        isEvmRequestMessage({ kind: 'request', id: 'r', method: 'm' })
+      ).toBe(false); // no ns
+      expect(
+        isEvmRequestMessage({ ns: 'other', kind: 'request', id: 'r', method: 'm' })
+      ).toBe(false);
+      expect(
+        isEvmRequestMessage({ ns: EVM_BRIDGE_NS, kind: 'response', id: 'r', method: 'm' })
+      ).toBe(false);
+      expect(
+        isEvmRequestMessage({ ns: EVM_BRIDGE_NS, kind: 'request', method: 'm' })
+      ).toBe(false); // no id
+      expect(
+        isEvmRequestMessage({ ns: EVM_BRIDGE_NS, kind: 'request', id: 1, method: 'm' })
+      ).toBe(false); // non-string id
+      expect(
+        isEvmRequestMessage({ ns: EVM_BRIDGE_NS, kind: 'request', id: 'r' })
+      ).toBe(false); // no method
+      expect(
+        isEvmRequestMessage({
+          ns: EVM_BRIDGE_NS,
+          kind: 'request',
+          id: 'r',
+          method: 'm',
+          params: 'nope',
+        })
+      ).toBe(false);
+    });
+  });
+
+  describe('isWalletHelloMessage', () => {
+    it('accepts a well-formed hello', () => {
+      expect(isWalletHelloMessage({ ns: WALLET_SIGNAL_NS, kind: 'hello' })).toBe(true);
+    });
+    it('rejects wrong ns / wrong kind / primitives', () => {
+      expect(isWalletHelloMessage({ ns: 'other', kind: 'hello' })).toBe(false);
+      expect(isWalletHelloMessage({ ns: WALLET_SIGNAL_NS, kind: 'ready' })).toBe(false);
+      expect(isWalletHelloMessage(null)).toBe(false);
+      expect(isWalletHelloMessage('hello')).toBe(false);
+    });
+    // hello and the EVM namespace must never cross-trigger.
+    it('does NOT match an EVM request envelope', () => {
+      expect(
+        isWalletHelloMessage({ ns: EVM_BRIDGE_NS, kind: 'hello' })
+      ).toBe(false);
+    });
+  });
+
+  describe('isWalletConnectRequestMessage', () => {
+    it('accepts a connect-request for each known channel', () => {
+      expect(
+        isWalletConnectRequestMessage({ ns: WALLET_SIGNAL_NS, kind: 'connect-request', channel: 'cosmos' })
+      ).toBe(true);
+      expect(
+        isWalletConnectRequestMessage({ ns: WALLET_SIGNAL_NS, kind: 'connect-request', channel: 'evm' })
+      ).toBe(true);
+    });
+    it('rejects wrong ns / wrong kind / unknown or missing channel', () => {
+      expect(
+        isWalletConnectRequestMessage({ ns: 'other', kind: 'connect-request', channel: 'cosmos' })
+      ).toBe(false);
+      expect(
+        isWalletConnectRequestMessage({ ns: WALLET_SIGNAL_NS, kind: 'ready', channel: 'cosmos' })
+      ).toBe(false);
+      expect(
+        isWalletConnectRequestMessage({ ns: WALLET_SIGNAL_NS, kind: 'connect-request', channel: 'svm' })
+      ).toBe(false);
+      expect(
+        isWalletConnectRequestMessage({ ns: WALLET_SIGNAL_NS, kind: 'connect-request' })
+      ).toBe(false);
+      expect(isWalletConnectRequestMessage(null)).toBe(false);
+    });
+  });
+
+  describe('isWalletCapabilitiesMessage', () => {
+    it('accepts capabilities with and without connectPrompt', () => {
+      expect(
+        isWalletCapabilitiesMessage({
+          ns: WALLET_SIGNAL_NS,
+          kind: 'capabilities',
+          canRequestConnect: { cosmos: true, evm: false },
+        })
+      ).toBe(true);
+      expect(
+        isWalletCapabilitiesMessage({
+          ns: WALLET_SIGNAL_NS,
+          kind: 'capabilities',
+          canRequestConnect: { cosmos: true, evm: true },
+          connectPrompt: 'Connect on the parent page',
+        })
+      ).toBe(true);
+    });
+    it('rejects non-boolean canRequestConnect entries / missing channel / non-string connectPrompt', () => {
+      expect(
+        isWalletCapabilitiesMessage({
+          ns: WALLET_SIGNAL_NS,
+          kind: 'capabilities',
+          canRequestConnect: { cosmos: 'yes', evm: true },
+        })
+      ).toBe(false);
+      expect(
+        isWalletCapabilitiesMessage({
+          ns: WALLET_SIGNAL_NS,
+          kind: 'capabilities',
+          canRequestConnect: { cosmos: true },
+        })
+      ).toBe(false);
+      expect(
+        isWalletCapabilitiesMessage({
+          ns: WALLET_SIGNAL_NS,
+          kind: 'capabilities',
+          canRequestConnect: { cosmos: true, evm: true },
+          connectPrompt: 42,
+        })
+      ).toBe(false);
+      expect(
+        isWalletCapabilitiesMessage({ ns: 'other', kind: 'capabilities', canRequestConnect: { cosmos: true, evm: true } })
+      ).toBe(false);
+      expect(isWalletCapabilitiesMessage(null)).toBe(false);
+    });
+  });
+
+  describe('isWalletSignalMessage', () => {
+    it('matches every control + ready/gone variant on the wallet namespace', () => {
+      expect(isWalletSignalMessage({ ns: WALLET_SIGNAL_NS, kind: 'hello' })).toBe(true);
+      expect(
+        isWalletSignalMessage({ ns: WALLET_SIGNAL_NS, kind: 'connect-request', channel: 'evm' })
+      ).toBe(true);
+      expect(
+        isWalletSignalMessage({
+          ns: WALLET_SIGNAL_NS,
+          kind: 'capabilities',
+          canRequestConnect: { cosmos: false, evm: false },
+        })
+      ).toBe(true);
+      expect(
+        isWalletSignalMessage({ ns: WALLET_SIGNAL_NS, kind: 'ready', channels: ['cosmos'] })
+      ).toBe(true);
+      expect(
+        isWalletSignalMessage({ ns: WALLET_SIGNAL_NS, kind: 'gone', channels: ['evm'] })
+      ).toBe(true);
+    });
+    it('rejects an EVM envelope and unknown kinds', () => {
+      expect(
+        isWalletSignalMessage({ ns: EVM_BRIDGE_NS, kind: 'request', id: 'x', method: 'm' })
+      ).toBe(false);
+      expect(isWalletSignalMessage({ ns: WALLET_SIGNAL_NS, kind: 'bogus' })).toBe(false);
     });
   });
 });

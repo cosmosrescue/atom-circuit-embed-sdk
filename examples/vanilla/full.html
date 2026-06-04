@@ -1,0 +1,120 @@
+<!doctype html>
+<!--
+  Full vanilla embed for the CDN / IIFE build: appearance and features.
+
+  Only referralId is required (see minimal.html for the simplest embed). This
+  file customizes how the widget looks and which features it exposes:
+    - appearance (theme, chrome, maxWidth, padding)
+    - validator choice (allowReferralChoice)
+    - lifecycle callbacks
+
+  The end user connects their wallet inside the widget, so no wallet
+  configuration is needed here. To reuse a wallet already connected on your
+  page, see parent-wallet.html.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atom Circuit embed - full</title>
+  </head>
+  <body>
+    <div id="atom-circuit-widget"></div>
+
+    <script
+      src="https://unpkg.com/@atom-circuit/embed-sdk@2.1.0/dist/atom-circuit.iife.js"
+      integrity="sha384-rZ29F2zRBfHEVxJldYGp/+NjMEXyVfDbGB9ifxpw0kub3yQoAWxYKeYbn7t42mBe"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      // Your validator referral id - swap fees stake to this validator. Replace
+      // 'general' with your own id; 'general' is the shared pool that fans fees across
+      // all participating validators, so this page runs without configuration.
+      var REFERRAL_ID = 'general';
+
+      /* ----------------------------------------------------------------- */
+      /* Appearance                                                         */
+      /* Theme tokens and chrome toggles. Omit theme or chrome entirely to  */
+      /* use the widget's own defaults.                                     */
+      /* ----------------------------------------------------------------- */
+
+      var THEME = {
+        mode: 'light',
+        accentColor: '#7b61ff',
+        accentForeground: '#ffffff',
+        background: '#ffffff',
+        foreground: '#11131a',
+        card: '#f5f6fa',
+        // Secondary surface tier: the validator/picker band and secondary panel.
+        cardSecondary: '#eceef5',
+        // Input surface only; overrides the card bundle for inputs.
+        input: '#ffffff',
+        mutedForeground: '#5b6172',
+        border: '#d8dbe5',
+        // Focused-input and emphasized-divider border color.
+        borderFocus: '#7b61ff',
+        warning: '#b8860b',
+        success: '#2e9e5b',
+        error: '#d64545',
+        radius: 12,
+        fontSize: 14,
+        // The widget loads no fonts itself; use one already on the host page.
+        fontFamily: 'Inter, system-ui, sans-serif',
+      };
+
+      // Each surface is shown by default; set a flag to false to hide it.
+      var CHROME = { logo: true, wallet: true, validator: true, footer: true };
+
+      // Mount the widget. Only referralId is required; every other option here
+      // customizes appearance or features.
+      AtomCircuit.mount(document.getElementById('atom-circuit-widget'), {
+        // Required.
+        referralId: REFERRAL_ID,
+
+        // Appearance.
+        theme: THEME,
+        chrome: CHROME,
+        width: '100%',
+        maxWidth: '480px',
+        padding: '16px',
+        minHeight: '520px',
+
+        // Validator choice. Let the end user pick the staking validator, with
+        // referralId pre-selected as the default.
+        allowReferralChoice: true,
+
+        // Lifecycle callbacks.
+        onReady: function (payload) {
+          console.log('atom-circuit ready', { protocolVersion: payload.protocolVersion });
+        },
+        onSwapSubmitted: function (payload) {
+          console.log('atom-circuit swap submitted', {
+            txHash: payload.txHash,
+            route: payload.route,
+          });
+        },
+        onSwapSuccess: function (payload) {
+          console.log('atom-circuit swap success', { txHash: payload.txHash });
+        },
+        onSwapError: function (payload) {
+          console.log('atom-circuit swap error', {
+            code: payload.code,
+            message: payload.message,
+          });
+        },
+        onResize: function (info) {
+          console.log('atom-circuit resize', { height: info.height });
+        },
+        // SDK-level problems (handshake, load, origin, protocol), distinct
+        // from the in-widget swap failures reported by onSwapError.
+        onError: function (error) {
+          console.log('atom-circuit sdk error', {
+            code: error.code,
+            message: error.message,
+            cause: error.cause,
+          });
+        },
+      });
+    </script>
+  </body>
+</html>

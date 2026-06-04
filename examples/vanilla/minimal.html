@@ -1,0 +1,42 @@
+<!doctype html>
+<!--
+  Minimal embed. The user connects their wallet inside the widget, so this is
+  the complete setup. referralId is the only required option.
+
+  One script tag, one container, one mount call. No wallet config or
+  theme is needed. See full.html for the appearance and features surface, and
+  parent-wallet.html for reusing your page's wallet.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atom Circuit embed - minimal</title>
+  </head>
+  <body>
+    <div id="atom-circuit-widget"></div>
+
+    <script
+      src="https://unpkg.com/@atom-circuit/embed-sdk@2.1.0/dist/atom-circuit.iife.js"
+      integrity="sha384-rZ29F2zRBfHEVxJldYGp/+NjMEXyVfDbGB9ifxpw0kub3yQoAWxYKeYbn7t42mBe"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      // Your validator referral id - swap fees stake to this validator. Replace
+      // 'general' with your own id; 'general' is the shared pool that fans fees across
+      // all participating validators, so this page runs without configuration.
+      var REFERRAL_ID = 'general';
+
+      AtomCircuit.mount(document.getElementById('atom-circuit-widget'), {
+        referralId: REFERRAL_ID,
+        minHeight: '520px',
+        onReady: function (payload) {
+          console.log('atom-circuit ready', { protocolVersion: payload.protocolVersion });
+        },
+        onSwapSuccess: function (payload) {
+          console.log('atom-circuit swap success', { txHash: payload.txHash });
+        },
+      });
+    </script>
+  </body>
+</html>

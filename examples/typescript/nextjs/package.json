@@ -1,0 +1,33 @@
+{
+  "name": "atom-circuit-nextjs-examples",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@atom-circuit/embed-sdk": "^2.1.0",
+    "@cosmos-kit/cosmostation": "^2.17.1",
+    "@cosmos-kit/keplr": "^2.17.1",
+    "@cosmos-kit/react": "^2.24.1",
+    "@interchain-ui/react": "1.26.3",
+    "@tanstack/react-query": "^5.99.0",
+    "@walletconnect/ethereum-provider": "^2.21.1",
+    "axios": "^1.15.0",
+    "chain-registry": "1.69.581",
+    "next": "^14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "viem": "^2.48.1",
+    "wagmi": "^3.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "eslint-config-next": "^14.2.5",
+    "typescript": "^5.5.3"
+  }
+}

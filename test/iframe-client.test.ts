@@ -239,7 +239,10 @@ describe('IframeClient (raw postMessage path)', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it('warns when the remote protocol version is incompatible', () => {
+  it('does NOT warn on a MAJOR mismatch (it rejects init instead) and records the incompatibility', () => {
+    // A major mismatch must surface as a hard error via init() rejection
+    // (mount classifies it as protocol_incompatible), NOT a warn. Warn-only is
+    // reserved for minor/patch drift where the wire shape stays compatible.
     const warn = vi.fn();
     const otherClient = new IframeClient({ iframe, warn });
     dispatchMessage(otherClient, {
@@ -251,12 +254,15 @@ describe('IframeClient (raw postMessage path)', () => {
         capabilities: [],
       },
     });
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0]?.[0]).toContain('protocol mismatch');
+    expect(warn).not.toHaveBeenCalled();
+    // The handshake is still recorded (so getHandshake / has reflect reality)
+    // but the incompatibility is latched so a subsequent waitForHandshake/init
+    // rejects.
+    expect(otherClient.getHandshake()?.protocolVersion).toBe('2.0.0');
     otherClient.destroy();
   });
 
-  it('does NOT warn on matching majors', () => {
+  it('WARNS (and still records) on a MINOR/PATCH mismatch with a matching major', () => {
     const warn = vi.fn();
     const otherClient = new IframeClient({ iframe, warn });
     dispatchMessage(otherClient, {
@@ -265,6 +271,24 @@ describe('IframeClient (raw postMessage path)', () => {
       data: {
         type: 'handshake',
         protocolVersion: '1.7.4',
+        capabilities: [],
+      },
+    });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toContain('protocol mismatch');
+    expect(otherClient.getHandshake()?.protocolVersion).toBe('1.7.4');
+    otherClient.destroy();
+  });
+
+  it('does NOT warn when the protocol version matches exactly', () => {
+    const warn = vi.fn();
+    const otherClient = new IframeClient({ iframe, warn });
+    dispatchMessage(otherClient, {
+      origin: WIDGET_ORIGIN,
+      source: remoteWindow,
+      data: {
+        type: 'handshake',
+        protocolVersion: PROTOCOL_VERSION,
         capabilities: [],
       },
     });
