@@ -7,7 +7,7 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
 
 jobs:
   publish:
@@ -51,3 +51,30 @@ jobs:
 
       - name: Publish to npm with provenance
         run: npm publish --provenance --access public
+
+      - name: Assemble release notes (SRI + changelog)
+        id: notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          HASH="sha384-$(openssl dgst -sha384 -binary dist/atom-circuit.iife.js | openssl base64 -A)"
+          awk -v v="$VERSION" '
+            /^## \[/ { if (seg) exit; if ($0 ~ "^## \\[" v "\\]") { seg=1; next } }
+            seg { print }
+          ' CHANGELOG.md > changelog-section.md
+          {
+            printf '## CDN integrity (Subresource Integrity)\n\n'
+            printf 'SRI hash for `@atom-circuit/embed-sdk@%s/dist/atom-circuit.iife.js`:\n\n' "$VERSION"
+            printf '```\n%s\n```\n\n' "$HASH"
+            printf '```html\n<script src="https://unpkg.com/@atom-circuit/embed-sdk@%s/dist/atom-circuit.iife.js" integrity="%s" crossorigin="anonymous"></script>\n```\n\n' "$VERSION" "$HASH"
+            printf -- '---\n\n'
+            cat changelog-section.md
+          } > release-notes.md
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: v${{ steps.notes.outputs.version }}
+          body_path: release-notes.md
+          make_latest: true
