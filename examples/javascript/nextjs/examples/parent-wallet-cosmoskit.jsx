@@ -94,7 +94,19 @@ for (const chain of evmChains) {
 const wagmiConfig = createConfig({
   chains: evmChains,
   connectors: [
-    injected(),
+    // EVM defaults to Keplr, so one wallet serves both Cosmos and EVM. Keplr
+    // announces via EIP-6963 (rdns 'app.keplr'), which wagmi discovers
+    // automatically; this explicit target is the fallback. Alternatives:
+    //   - MetaMask / any injected wallet: use a bare `injected()` (resolves to window.ethereum)
+    //   - let the user pick from all installed wallets: rely on wagmi's default
+    //     EIP-6963 discovery and render the `useConnect().connectors` list
+    injected({
+      target: () => ({
+        id: 'app.keplr',
+        name: 'Keplr',
+        provider: typeof window !== 'undefined' ? window.keplr?.ethereum : undefined,
+      }),
+    }),
     walletConnect({ projectId: WALLETCONNECT_PROJECT_ID }),
   ],
   transports: evmTransports,
@@ -143,8 +155,13 @@ function SwapPanel() {
   const { status: evmStatus, connector, address: evmAddress } = useAccount();
   const isEvmConnected = evmStatus === 'connected';
   const { connect, connectors } = useConnect();
-  const injectedConnector =
-    connectors.find((c) => c.type === 'injected') ?? connectors[0];
+  // Prefer the EIP-6963-discovered Keplr connector, then the explicit target above.
+  // To use MetaMask instead, find `c.type === 'injected'`; to offer a chooser, map over `connectors`.
+  const evmConnector =
+    connectors.find((c) => c.rdns === 'app.keplr') ??
+    connectors.find((c) => c.id === 'app.keplr') ??
+    connectors.find((c) => c.name === 'Keplr') ??
+    connectors[0];
 
   // fromWagmi needs the resolved EIP-1193 provider, which wagmi exposes
   // asynchronously via connector.getProvider(). Resolve it only when the EVM
@@ -190,9 +207,9 @@ function SwapPanel() {
         </button>
         <button
           type="button"
-          onClick={() => injectedConnector && connect({ connector: injectedConnector })}
+          onClick={() => evmConnector && connect({ connector: evmConnector })}
         >
-          {isEvmConnected && evmAddress ? `EVM: ${evmAddress}` : 'Connect EVM (wagmi)'}
+          {isEvmConnected && evmAddress ? `EVM: ${evmAddress}` : 'Connect EVM (Keplr)'}
         </button>
       </header>
 
@@ -215,8 +232,8 @@ function SwapPanel() {
         onWalletConnectRequest={(channel) => {
           if (channel === 'cosmos') {
             openView();
-          } else if (injectedConnector) {
-            connect({ connector: injectedConnector });
+          } else if (evmConnector) {
+            connect({ connector: evmConnector });
           }
         }}
 

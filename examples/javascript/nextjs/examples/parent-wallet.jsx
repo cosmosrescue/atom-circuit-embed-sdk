@@ -47,10 +47,11 @@ function getInjectedCosmosProvider() {
   return w.keplr ?? w.cosmostation?.providers?.keplr;
 }
 
-// Any EIP-1193 provider satisfies the EVM handle: window.ethereum, or a
-// resolved wagmi provider via `await connector.getProvider()`.
+// Prefer Keplr's EVM provider (window.keplr.ethereum) so one Keplr wallet
+// serves both Cosmos and EVM; fall back to window.ethereum (MetaMask / any
+// other injected EVM wallet).
 function getInjectedEvmProvider() {
-  return window.ethereum;
+  return window.keplr?.ethereum ?? window.ethereum;
 }
 
 export default function Page() {

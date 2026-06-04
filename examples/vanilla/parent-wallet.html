@@ -88,11 +88,11 @@
           });
       }
 
-      // Connect the parent-page EVM wallet. Any EIP-1193 provider satisfies the
-      // handle: window.ethereum, or a resolved wagmi provider via
-      // `await connector.getProvider()`.
+      // Connect the parent-page EVM wallet. Prefer Keplr's EVM provider so one
+      // Keplr wallet serves both Cosmos and EVM; fall back to window.ethereum
+      // (MetaMask / any other injected EVM wallet).
       function connectEvm() {
-        var provider = window.ethereum;
+        var provider = (window.keplr && window.keplr.ethereum) || window.ethereum;
         if (!provider) {
           console.warn('No injected EVM wallet found.');
           return;

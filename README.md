@@ -290,6 +290,8 @@ mount(container, {
 });
 ```
 
+**Reuse one wallet for both channels:** Keplr also exposes an EVM provider at `window.keplr.ethereum`, so a single Keplr wallet can serve both the Cosmos and EVM channels. Pass `fromWagmi(window.keplr.ethereum)` directly, or with wagmi target Keplr through an `injected` connector (Keplr announces via EIP-6963 with rdns `app.keplr`). A bare `injected()` or `window.ethereum` resolves to MetaMask, or whatever owns `window.ethereum`.
+
 The EVM bridge relays `provider.request(...)` calls to your wallet and forwards its `accountsChanged` / `chainChanged` / `disconnect` events to the widget. `on` / `removeListener` on the provider are optional: when absent the bridge simply relays requests and forwards no push events.
 
 You can pass both `cosmos` and `evm`; the loader wires only the side(s) you supply.
