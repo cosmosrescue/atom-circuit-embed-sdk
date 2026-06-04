@@ -8,7 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "@atom-circuit/embed-sdk": "^2.1.0",
+    "@atom-circuit/embed-sdk": "^2.2.0",
     "@cosmos-kit/cosmostation": "^2.17.1",
     "@cosmos-kit/keplr": "^2.17.1",
     "@cosmos-kit/react": "^2.24.1",

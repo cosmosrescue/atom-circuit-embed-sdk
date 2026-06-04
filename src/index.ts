@@ -20,6 +20,7 @@ export type {
   MountErrorCode,
   OfflineSignerLike,
   ReadyPayload,
+  SwapBridgingPayload,
   SwapErrorPayload,
   SwapRouteSummary,
   SwapSubmittedPayload,

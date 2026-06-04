@@ -18,8 +18,8 @@ For static sites that do not bundle, load the IIFE from a CDN with a pinned Subr
 
 ```html
 <script
-  src="https://unpkg.com/@atom-circuit/embed-sdk@2.1.0/dist/atom-circuit.iife.js"
-  integrity="sha384-rZ29F2zRBfHEVxJldYGp/+NjMEXyVfDbGB9ifxpw0kub3yQoAWxYKeYbn7t42mBe"
+  src="https://unpkg.com/@atom-circuit/embed-sdk@2.2.0/dist/atom-circuit.iife.js"
+  integrity="sha384-j2or14ssl/NImUjt50RSLgSJCB6aT3+ljALwwDC3VeBiexXl/HNp8qXCbQ46mZTV"
   crossorigin="anonymous"
 ></script>
 ```
@@ -40,7 +40,7 @@ Pick the stack you ship with. Replace `YOUR_REFERRAL_ID` with the value from you
 
 ```html
 <div id="atom-circuit-widget"></div>
-<script src="https://unpkg.com/@atom-circuit/embed-sdk@2.1.0/dist/atom-circuit.iife.js"></script>
+<script src="https://unpkg.com/@atom-circuit/embed-sdk@2.2.0/dist/atom-circuit.iife.js"></script>
 <script>
   AtomCircuit.mount(document.getElementById('atom-circuit-widget'), {
     referralId: 'YOUR_REFERRAL_ID',
@@ -130,7 +130,7 @@ Each app contains the minimal, full, parent-wallet, and parent-wallet-cosmoskit 
 | `width` / `maxWidth` / `minHeight` / `padding` | Optional | see [Sizing](#sizing) | Layout of the widget wrapper.                              |
 | `theme`                  | Optional     | dark preset | Color palette and typography. See [Theming](#theming).               |
 | `chrome`                 | Optional     | all visible | Hide individual surfaces (logo, wallet button, validator row, footer). |
-| `onReady` / `onResize` / `onSwapSubmitted` / `onSwapSuccess` / `onSwapError` / `onError` | Optional | none | Lifecycle and swap callbacks. See [Callbacks](#callbacks). |
+| `onReady` / `onResize` / `onSwapSubmitted` / `onSwapBridging` / `onSwapSuccess` / `onSwapError` / `onError` | Optional | none | Lifecycle and swap callbacks. See [Callbacks](#callbacks). |
 | `wallet`                 | Optional     | `'iframe'`  | Advanced: reuse a wallet already connected on your page. See [Reusing the parent page's wallet](#reusing-the-parent-pages-wallet). |
 
 No option is required: omit everything and the widget mounts in default mode with `referralId: 'general'`, the end user connecting their own wallet inside the iframe. `referralId` is the one option you will almost always set so the fee stakes to a specific validator. The `wallet` option (parent-wallet reuse) is an advanced opt-in covered last.
@@ -154,6 +154,7 @@ const { iframe, wrapper, client, destroy } = AtomCircuit.mount(container, {
   onReady:         ({ protocolVersion }) => {},
   onResize:        ({ height })          => {},
   onSwapSubmitted: ({ txHash, route })   => {},
+  onSwapBridging:  ({ chainId, explorerLink }) => {},
   onSwapSuccess:   ({ txHash })          => {},
   onSwapError:     ({ code, message })   => {},
   onError:         ({ code, message })   => {},
@@ -327,8 +328,8 @@ The IIFE build exposes the same wallet helpers on the `AtomCircuit` global, so a
 
 ```html
 <script
-  src="https://unpkg.com/@atom-circuit/embed-sdk@2.1.0/dist/atom-circuit.iife.js"
-  integrity="sha384-rZ29F2zRBfHEVxJldYGp/+NjMEXyVfDbGB9ifxpw0kub3yQoAWxYKeYbn7t42mBe"
+  src="https://unpkg.com/@atom-circuit/embed-sdk@2.2.0/dist/atom-circuit.iife.js"
+  integrity="sha384-j2or14ssl/NImUjt50RSLgSJCB6aT3+ljALwwDC3VeBiexXl/HNp8qXCbQ46mZTV"
   crossorigin="anonymous"
 ></script>
 <script>
@@ -461,9 +462,12 @@ In both cases `height` and `width` are managed by the SDK (use the `width` / `ma
 | `onReady`         | iframe handshake completes; from here the widget is interactive                       | `{ protocolVersion }`            |
 | `onResize`        | iframe content height changes                                                          | `{ height }` in px               |
 | `onSwapSubmitted` | user signed and the source-chain tx broadcast                                          | `{ txHash, route }`              |
+| `onSwapBridging`  | a multi-step swap's bridge leg is still settling (source tx broadcast, not yet done)   | `{ chainId, explorerLink? }`     |
 | `onSwapSuccess`   | cross-chain delivery confirmed by the indexer                                          | `{ txHash }` (source-chain hash) |
 | `onSwapError`     | swap failed inside the iframe or the wallet rejected the signature                     | `{ code, message }`              |
 | `onError`         | SDK-level failure: handshake timeout, iframe load failure, origin mismatch, protocol  | `{ code, message, cause }`       |
+
+`onSwapBridging` is non-terminal: it fires while a multi-step swap's bridge leg is still in flight (for example a CCTP transfer mid-attestation - the source transaction has broadcast and funds are bridging to the next chain, but the swap is not complete). A later `onSwapSuccess` or `onSwapError` still fires for the same swap. It may fire zero times for single-chain swaps that never bridge. Payload `chainId` is the intermediate chain, and `explorerLink` (when present) deep-links the in-flight bridge leg.
 
 `onError` covers widget bring-up failures; `onSwapError` covers in-flow swap failures. They are separate so a host can wire different UI for each.
 
@@ -520,7 +524,7 @@ Use `AtomCircuit.mount()` directly into a persistent DOM container outside the r
 
 ```html
 <div id="atom-circuit-widget" style="display: none;"></div>
-<script src="https://unpkg.com/@atom-circuit/embed-sdk@2.1.0/dist/atom-circuit.iife.js"></script>
+<script src="https://unpkg.com/@atom-circuit/embed-sdk@2.2.0/dist/atom-circuit.iife.js"></script>
 <script>
   AtomCircuit.mount(document.getElementById('atom-circuit-widget'), {
     referralId: 'YOUR_REFERRAL_ID',
@@ -554,8 +558,8 @@ Current SRI hash:
 
 ```html
 <script
-  src="https://unpkg.com/@atom-circuit/embed-sdk@2.1.0/dist/atom-circuit.iife.js"
-  integrity="sha384-rZ29F2zRBfHEVxJldYGp/+NjMEXyVfDbGB9ifxpw0kub3yQoAWxYKeYbn7t42mBe"
+  src="https://unpkg.com/@atom-circuit/embed-sdk@2.2.0/dist/atom-circuit.iife.js"
+  integrity="sha384-j2or14ssl/NImUjt50RSLgSJCB6aT3+ljALwwDC3VeBiexXl/HNp8qXCbQ46mZTV"
   crossorigin="anonymous"
 ></script>
 ```
@@ -563,7 +567,7 @@ Current SRI hash:
 Verify the hash yourself:
 
 ```sh
-curl -sL https://unpkg.com/@atom-circuit/embed-sdk@2.1.0/dist/atom-circuit.iife.js \
+curl -sL https://unpkg.com/@atom-circuit/embed-sdk@2.2.0/dist/atom-circuit.iife.js \
   | openssl dgst -sha384 -binary | openssl base64 -A
 ```
 

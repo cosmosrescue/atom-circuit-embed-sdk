@@ -65,6 +65,7 @@ export interface ResizeMessage {
 export type WidgetEventName =
   | 'ready'
   | 'swap:submitted'
+  | 'swap:bridging'
   | 'swap:success'
   | 'swap:error';
 
@@ -89,6 +90,19 @@ export interface ReadyPayload {
 export interface SwapSubmittedPayload {
   readonly txHash: string;
   readonly route?: SwapRouteSummary;
+}
+
+export interface SwapBridgingPayload {
+  /**
+   * The intermediate chain id the funds are currently bridging on / through.
+   * The source-chain tx already succeeded (see {@link SwapSubmittedPayload});
+   * this event marks the swap as still in flight, NOT terminal.
+   */
+  readonly chainId: string;
+  /**
+   * Optional Skip explorer deep-link for tracking the in-flight bridge leg.
+   */
+  readonly explorerLink?: string;
 }
 
 export interface SwapSuccessPayload {
@@ -116,6 +130,7 @@ export interface SwapRouteSummary {
 export type WidgetEvent =
   | { readonly name: 'ready'; readonly payload: ReadyPayload }
   | { readonly name: 'swap:submitted'; readonly payload: SwapSubmittedPayload }
+  | { readonly name: 'swap:bridging'; readonly payload: SwapBridgingPayload }
   | { readonly name: 'swap:success'; readonly payload: SwapSuccessPayload }
   | { readonly name: 'swap:error'; readonly payload: SwapErrorPayload };
 
@@ -628,6 +643,13 @@ export interface MountOptions {
    */
   onSwapSubmitted?: (payload: SwapSubmittedPayload) => void;
   /**
+   * Fires while a submitted swap's funds are bridging on an intermediate chain
+   * (source tx succeeded, swap not yet complete). NON-terminal: a later
+   * `onSwapSuccess` or `onSwapError` still fires for the same swap. May fire
+   * zero times for single-chain swaps that never bridge.
+   */
+  onSwapBridging?: (payload: SwapBridgingPayload) => void;
+  /**
    * Fires when a submitted swap confirms on chain.
    */
   onSwapSuccess?: (payload: SwapSuccessPayload) => void;
@@ -755,6 +777,7 @@ export function isResizeMessage(value: unknown): value is ResizeMessage {
 const WIDGET_EVENT_NAMES: ReadonlySet<WidgetEventName> = new Set([
   'ready',
   'swap:submitted',
+  'swap:bridging',
   'swap:success',
   'swap:error',
 ]);

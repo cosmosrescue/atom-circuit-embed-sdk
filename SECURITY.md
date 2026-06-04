@@ -63,8 +63,8 @@ Use the output in the `<script>` tag:
 
 ```html
 <script
-  src="https://unpkg.com/@atom-circuit/embed-sdk@2.1.0/dist/atom-circuit.iife.js"
-  integrity="sha384-rZ29F2zRBfHEVxJldYGp/+NjMEXyVfDbGB9ifxpw0kub3yQoAWxYKeYbn7t42mBe"
+  src="https://unpkg.com/@atom-circuit/embed-sdk@2.2.0/dist/atom-circuit.iife.js"
+  integrity="sha384-j2or14ssl/NImUjt50RSLgSJCB6aT3+ljALwwDC3VeBiexXl/HNp8qXCbQ46mZTV"
   crossorigin="anonymous"
 ></script>
 ```

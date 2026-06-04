@@ -14,6 +14,7 @@ import {
   type MountErrorCode,
   type MountOptions,
   type ReadyPayload,
+  type SwapBridgingPayload,
   type SwapErrorPayload,
   type SwapSubmittedPayload,
   type SwapSuccessPayload,
@@ -511,6 +512,10 @@ export function mount(container: HTMLElement, opts: MountOptions = {}): MountRes
   if (opts.onSwapSubmitted) {
     const fn = opts.onSwapSubmitted;
     subscriptions.push(client.on('swap:submitted', (p: SwapSubmittedPayload) => fn(p)));
+  }
+  if (opts.onSwapBridging) {
+    const fn = opts.onSwapBridging;
+    subscriptions.push(client.on('swap:bridging', (p: SwapBridgingPayload) => fn(p)));
   }
   if (opts.onSwapSuccess) {
     const fn = opts.onSwapSuccess;

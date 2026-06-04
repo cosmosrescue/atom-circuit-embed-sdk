@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file. The format
 follows Keep a Changelog (https://keepachangelog.com/en/1.1.0/), and this
 project adheres to Semantic Versioning (https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-06-04
+
+### Added
+
+- `onSwapBridging` host event (`mount()` option and `<AtomCircuitSwap />` prop): fires while a multi-step swap's bridge leg is still settling (e.g. a CCTP transfer mid-attestation). The source transaction has broadcast and funds are bridging to the next chain; the swap is not yet complete. Non-terminal - a later `onSwapSuccess` / `onSwapError` still fires for the same swap. Payload `{ chainId, explorerLink? }`. Backward compatible: integrators who do not subscribe are unaffected.
+
 ## [2.1.0] - 2026-06-04
 
 ### Added

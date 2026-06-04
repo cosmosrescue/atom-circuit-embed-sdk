@@ -22,6 +22,7 @@ import type {
   MountErrorCode,
   MountOptions,
   ReadyPayload,
+  SwapBridgingPayload,
   SwapErrorPayload,
   SwapRouteSummary,
   SwapSubmittedPayload,
@@ -39,6 +40,7 @@ export type {
   MountErrorCode,
   MountResult,
   ReadyPayload,
+  SwapBridgingPayload,
   SwapErrorPayload,
   SwapRouteSummary,
   SwapSubmittedPayload,
@@ -81,6 +83,8 @@ export interface AtomCircuitSwapProps {
   onResize?: (info: { height: number }) => void;
   /** Fires when a user submits a swap. */
   onSwapSubmitted?: (payload: SwapSubmittedPayload) => void;
+  /** Fires while a multi-step swap's bridge leg is still settling (non-terminal; a later success/error still fires). */
+  onSwapBridging?: (payload: SwapBridgingPayload) => void;
   /** Fires when a submitted swap confirms on chain. */
   onSwapSuccess?: (payload: SwapSuccessPayload) => void;
   /** Fires when a swap fails or is rejected by the wallet. */
@@ -220,6 +224,7 @@ export function AtomCircuitSwap(props: AtomCircuitSwapProps): ReactElement | nul
       onReady: (payload) => propsRef.current.onReady?.(payload),
       onResize: (info) => propsRef.current.onResize?.(info),
       onSwapSubmitted: (payload) => propsRef.current.onSwapSubmitted?.(payload),
+      onSwapBridging: (payload) => propsRef.current.onSwapBridging?.(payload),
       onSwapSuccess: (payload) => propsRef.current.onSwapSuccess?.(payload),
       onSwapError: (payload) => propsRef.current.onSwapError?.(payload),
       onError: (error) => propsRef.current.onError?.(error),

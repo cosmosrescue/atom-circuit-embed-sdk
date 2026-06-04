@@ -28,6 +28,7 @@ import {
   type Capabilities,
   type HandshakeMessage,
   type ReadyPayload,
+  type SwapBridgingPayload,
   type SwapErrorPayload,
   type SwapSubmittedPayload,
   type SwapSuccessPayload,
@@ -68,6 +69,7 @@ export interface EventHandlers {
   ready: (payload: ReadyPayload) => void;
   resize: (info: { height: number }) => void;
   'swap:submitted': (payload: SwapSubmittedPayload) => void;
+  'swap:bridging': (payload: SwapBridgingPayload) => void;
   'swap:success': (payload: SwapSuccessPayload) => void;
   'swap:error': (payload: SwapErrorPayload) => void;
 }
@@ -140,6 +142,7 @@ export class IframeClient {
     ready: new Set(),
     resize: new Set(),
     'swap:submitted': new Set(),
+    'swap:bridging': new Set(),
     'swap:success': new Set(),
     'swap:error': new Set(),
   };
@@ -387,6 +390,9 @@ export class IframeClient {
         return;
       case 'swap:submitted':
         this.emitTyped('swap:submitted', message.payload as SwapSubmittedPayload);
+        return;
+      case 'swap:bridging':
+        this.emitTyped('swap:bridging', message.payload as SwapBridgingPayload);
         return;
       case 'swap:success':
         this.emitTyped('swap:success', message.payload as SwapSuccessPayload);
