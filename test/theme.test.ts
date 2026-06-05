@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
 
 import {
+  DEFAULT_MAX_SCALE,
   encodeTheme,
   validateAllowReferralChoice,
+  validateAutoscale,
   validateChrome,
+  validateMaxScale,
   validateTheme,
 } from '../src/theme.js';
 import type { ChromeOptions, ThemeOptions } from '../src/protocol.js';
@@ -525,5 +528,192 @@ describe('encodeTheme with allowReferralChoice', () => {
       encodeTheme(theme, chrome, undefined)
     );
     expect(encodeTheme(theme, chrome)).toBe(encodeTheme(theme, chrome, false));
+  });
+});
+
+describe('validateAutoscale', () => {
+  it('returns true only for the strict boolean true', () => {
+    expect(validateAutoscale(true)).toBe(true);
+  });
+
+  it('returns false for the strict boolean false', () => {
+    expect(validateAutoscale(false)).toBe(false);
+  });
+
+  it('returns false for undefined (the default-absent path)', () => {
+    expect(validateAutoscale(undefined)).toBe(false);
+  });
+
+  it('drops truthy-but-non-boolean values (invalid -> false)', () => {
+    expect(validateAutoscale(1)).toBe(false);
+    expect(validateAutoscale('true')).toBe(false);
+    expect(validateAutoscale('yes')).toBe(false);
+    expect(validateAutoscale({})).toBe(false);
+    expect(validateAutoscale([])).toBe(false);
+    expect(validateAutoscale(null)).toBe(false);
+  });
+});
+
+describe('validateMaxScale', () => {
+  it('returns an in-range value verbatim', () => {
+    expect(validateMaxScale(1.0)).toBe(1.0);
+    expect(validateMaxScale(1.5)).toBe(1.5);
+    expect(validateMaxScale(2.0)).toBe(2.0);
+    expect(validateMaxScale(3.0)).toBe(3.0);
+    expect(validateMaxScale(1.25)).toBe(1.25);
+  });
+
+  it('accepts the exact lower bound 1.0', () => {
+    expect(validateMaxScale(1.0)).toBe(1.0);
+  });
+
+  it('accepts the exact upper bound 3.0', () => {
+    expect(validateMaxScale(3.0)).toBe(3.0);
+  });
+
+  it('clamps a value below the lower bound up to 1.0', () => {
+    expect(validateMaxScale(0.5)).toBe(1.0);
+    expect(validateMaxScale(0)).toBe(1.0);
+    expect(validateMaxScale(-10)).toBe(1.0);
+    expect(validateMaxScale(0.999)).toBe(1.0);
+  });
+
+  it('clamps a value above the upper bound down to 3.0', () => {
+    expect(validateMaxScale(3.001)).toBe(3.0);
+    expect(validateMaxScale(5)).toBe(3.0);
+    expect(validateMaxScale(1000)).toBe(3.0);
+  });
+
+  it('falls back to the default for NaN / Infinity', () => {
+    expect(validateMaxScale(Number.NaN)).toBe(DEFAULT_MAX_SCALE);
+    expect(validateMaxScale(Number.POSITIVE_INFINITY)).toBe(DEFAULT_MAX_SCALE);
+    expect(validateMaxScale(Number.NEGATIVE_INFINITY)).toBe(DEFAULT_MAX_SCALE);
+  });
+
+  it('falls back to the default for non-number / undefined', () => {
+    expect(validateMaxScale(undefined)).toBe(DEFAULT_MAX_SCALE);
+    expect(validateMaxScale(null)).toBe(DEFAULT_MAX_SCALE);
+    expect(validateMaxScale('1.5')).toBe(DEFAULT_MAX_SCALE);
+    expect(validateMaxScale('2')).toBe(DEFAULT_MAX_SCALE);
+    expect(validateMaxScale({})).toBe(DEFAULT_MAX_SCALE);
+    expect(validateMaxScale([])).toBe(DEFAULT_MAX_SCALE);
+    expect(validateMaxScale(true)).toBe(DEFAULT_MAX_SCALE);
+  });
+
+  it('exposes 1.5 as the default constant', () => {
+    expect(DEFAULT_MAX_SCALE).toBe(1.5);
+  });
+});
+
+describe('encodeTheme with autoscale + maxScale', () => {
+  function decode(b64: string): string {
+    return typeof atob === 'function'
+      ? atob(b64)
+      : Buffer.from(b64, 'base64').toString('utf-8');
+  }
+
+  it('attaches autoscale:true and maxScale at the top level when autoscale is true', () => {
+    const theme: ThemeOptions = { mode: 'dark' };
+    const encoded = encodeTheme(theme, undefined, false, {
+      autoscale: true,
+      maxScale: 2,
+    });
+    const parsed = JSON.parse(decode(encoded)) as Record<string, unknown>;
+    expect(parsed['mode']).toBe('dark');
+    expect(parsed['autoscale']).toBe(true);
+    expect(parsed['maxScale']).toBe(2);
+  });
+
+  it('writes the default maxScale (1.5) when autoscale is true but maxScale omitted', () => {
+    const encoded = encodeTheme({}, undefined, false, { autoscale: true });
+    const parsed = JSON.parse(decode(encoded)) as Record<string, unknown>;
+    expect(parsed['autoscale']).toBe(true);
+    expect(parsed['maxScale']).toBe(1.5);
+  });
+
+  it('clamps an out-of-range maxScale before encoding', () => {
+    const low = encodeTheme({}, undefined, false, {
+      autoscale: true,
+      maxScale: 0.25,
+    });
+    expect(
+      (JSON.parse(decode(low)) as Record<string, unknown>)['maxScale']
+    ).toBe(1.0);
+    const high = encodeTheme({}, undefined, false, {
+      autoscale: true,
+      maxScale: 9,
+    });
+    expect(
+      (JSON.parse(decode(high)) as Record<string, unknown>)['maxScale']
+    ).toBe(3.0);
+  });
+
+  it('falls back to default maxScale for a non-finite value', () => {
+    const encoded = encodeTheme({}, undefined, false, {
+      autoscale: true,
+      maxScale: Number.NaN,
+    });
+    expect(
+      (JSON.parse(decode(encoded)) as Record<string, unknown>)['maxScale']
+    ).toBe(1.5);
+  });
+
+  it('rides alongside theme + chrome + allowReferralChoice in one blob', () => {
+    const theme: ThemeOptions = { mode: 'dark', accentColor: '#abc' };
+    const chrome: ChromeOptions = { wallet: false };
+    const encoded = encodeTheme(theme, chrome, true, {
+      autoscale: true,
+      maxScale: 2.5,
+    });
+    const parsed = JSON.parse(decode(encoded)) as Record<string, unknown>;
+    expect(parsed['mode']).toBe('dark');
+    expect(parsed['accentColor']).toBe('#abc');
+    expect(parsed['chrome']).toEqual({ wallet: false });
+    expect(parsed['allowReferralChoice']).toBe(true);
+    expect(parsed['autoscale']).toBe(true);
+    expect(parsed['maxScale']).toBe(2.5);
+  });
+
+  it('allows an autoscale-only payload (empty theme, no chrome, no referral choice)', () => {
+    const encoded = encodeTheme({}, undefined, false, {
+      autoscale: true,
+      maxScale: 1.5,
+    });
+    const parsed = JSON.parse(decode(encoded)) as Record<string, unknown>;
+    expect(parsed).toEqual({ autoscale: true, maxScale: 1.5 });
+  });
+
+  it('omits BOTH keys when autoscale is false (back-compat)', () => {
+    const theme: ThemeOptions = { mode: 'dark' };
+    const encoded = encodeTheme(theme, undefined, false, {
+      autoscale: false,
+      maxScale: 2,
+    });
+    const parsed = JSON.parse(decode(encoded)) as Record<string, unknown>;
+    expect(parsed).not.toHaveProperty('autoscale');
+    expect(parsed).not.toHaveProperty('maxScale');
+  });
+
+  it('omits BOTH keys when the options bag is absent (back-compat)', () => {
+    const theme: ThemeOptions = { mode: 'dark' };
+    const parsed = JSON.parse(
+      decode(encodeTheme(theme))
+    ) as Record<string, unknown>;
+    expect(parsed).not.toHaveProperty('autoscale');
+    expect(parsed).not.toHaveProperty('maxScale');
+  });
+
+  it('produces a byte-identical blob to the prior 3-arg call when autoscale absent', () => {
+    const theme: ThemeOptions = { mode: 'dark', accentColor: '#abc' };
+    const chrome: ChromeOptions = { logo: false };
+    expect(encodeTheme(theme, chrome, true)).toBe(
+      encodeTheme(theme, chrome, true, undefined)
+    );
+    expect(encodeTheme(theme, chrome, true)).toBe(
+      encodeTheme(theme, chrome, true, null)
+    );
+    expect(encodeTheme(theme, chrome, true)).toBe(
+      encodeTheme(theme, chrome, true, { autoscale: false, maxScale: 2 })
+    );
   });
 });

@@ -31,7 +31,9 @@ import {
 import {
   encodeTheme,
   validateAllowReferralChoice,
+  validateAutoscale,
   validateChrome,
+  validateMaxScale,
   validateTheme,
 } from './theme.js';
 
@@ -118,7 +120,14 @@ export interface MountResult {
 
 type BuildSrcOpts = Pick<
   MountOptions,
-  'origin' | 'path' | 'theme' | 'chrome' | 'allowReferralChoice' | 'wallet'
+  | 'origin'
+  | 'path'
+  | 'theme'
+  | 'chrome'
+  | 'allowReferralChoice'
+  | 'autoscale'
+  | 'maxScale'
+  | 'wallet'
 > & {
   /** Resolved referralId. mount() defaults undefined/empty to 'general'
    * before calling buildSrc, so this is always a non-empty string here. */
@@ -159,20 +168,29 @@ function buildSrc(opts: BuildSrcOpts): string {
     opts.allowReferralChoice
   );
 
-  // Set the `theme` param when ANY of theme / chrome / allowReferralChoice is
-  // present so a host can opt into referral choice without supplying a theme
-  // or chrome override.
+  // autoscale collapses to a strict boolean; only the literal `true` is carried
+  // on the wire (default-false path stays byte-identical to prior output). When
+  // on, maxScale is validated/clamped to [1,3] (invalid -> 1.5 default) and
+  // rides alongside; when off, both are omitted.
+  const autoscale = validateAutoscale(opts.autoscale);
+  const maxScale = autoscale ? validateMaxScale(opts.maxScale) : undefined;
+
+  // Set the `theme` param when ANY of theme / chrome / allowReferralChoice /
+  // autoscale is present so a host can opt into any of these without supplying
+  // a theme or chrome override.
   if (
     validatedTheme !== null ||
     validatedChrome !== null ||
-    allowReferralChoice
+    allowReferralChoice ||
+    autoscale
   ) {
     params.set(
       'theme',
       encodeTheme(
         validatedTheme ?? {},
         validatedChrome ?? undefined,
-        allowReferralChoice
+        allowReferralChoice,
+        autoscale ? { autoscale: true, maxScale } : undefined
       )
     );
   }
@@ -326,6 +344,8 @@ export function mount(container: HTMLElement, opts: MountOptions = {}): MountRes
     ...(opts.allowReferralChoice !== undefined
       ? { allowReferralChoice: opts.allowReferralChoice }
       : {}),
+    ...(opts.autoscale !== undefined ? { autoscale: opts.autoscale } : {}),
+    ...(opts.maxScale !== undefined ? { maxScale: opts.maxScale } : {}),
     ...(opts.wallet !== undefined ? { wallet: opts.wallet } : {}),
     warn: warnSink,
   });
@@ -667,6 +687,8 @@ export function buildIframeSrc(
     | 'theme'
     | 'chrome'
     | 'allowReferralChoice'
+    | 'autoscale'
+    | 'maxScale'
     | 'wallet'
   > & {
     readonly warn?: (message: string) => void;

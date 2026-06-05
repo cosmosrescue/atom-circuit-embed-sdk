@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file. The format
 follows Keep a Changelog (https://keepachangelog.com/en/1.1.0/), and this
 project adheres to Semantic Versioning (https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1] - 2026-06-05
+
+### Added
+
+- `autoscale` and `maxScale` options (`mount()` option and `<AtomCircuitSwap />` prop): when `autoscale` is `true`, the embedded widget scales up proportionally to the width it is given - buttons, text, icons, and spacing all grow together - so it does not render small on large desktop screens. The scale is derived from the available width against the widget's natural design width and capped by `maxScale` (default `1.5`, clamped to `[1.0, 3.0]`). Below the natural width it falls back to the normal fluid layout, so narrow containers and mobile are unaffected. Backward compatible: with `autoscale` off (the default) the widget renders exactly as before.
+
 ## [2.2.0] - 2026-06-04
 
 ### Added

@@ -218,6 +218,49 @@ export function validateAllowReferralChoice(value: unknown): boolean {
 }
 
 /**
+ * Default {@link MountOptions.maxScale} when autoscale is on but no explicit
+ * cap is supplied (or an invalid one is dropped).
+ */
+export const DEFAULT_MAX_SCALE = 1.5;
+
+/**
+ * Lower / upper clamp bounds for {@link MountOptions.maxScale}.
+ */
+export const MAX_SCALE_MIN = 1.0;
+export const MAX_SCALE_MAX = 3.0;
+
+/**
+ * Validate the host-supplied `autoscale` flag. Returns `true` only when the
+ * input is the strict boolean `true`; every other value (including `false`,
+ * `undefined`, numbers, strings, objects) collapses to `false`.
+ *
+ * The asymmetry mirrors {@link validateAllowReferralChoice}: the wire only
+ * ever carries the flag when it is `true` (see {@link encodeTheme}), so the
+ * default-false path produces a payload byte-identical to the prior protocol
+ * output. An invalid value is dropped (treated as false) rather than rejecting
+ * the whole theme.
+ */
+export function validateAutoscale(value: unknown): boolean {
+  return value === true;
+}
+
+/**
+ * Validate the host-supplied `maxScale` value. Returns a finite number clamped
+ * to the inclusive range [{@link MAX_SCALE_MIN}, {@link MAX_SCALE_MAX}]. A
+ * non-number, NaN, or infinite value falls back to {@link DEFAULT_MAX_SCALE}
+ * rather than rejecting the rest of the payload (orthogonal-drop discipline).
+ *
+ * An in-range value is returned verbatim; an out-of-range finite value is
+ * clamped to the nearest bound (so 0.5 -> 1.0 and 5 -> 3.0).
+ */
+export function validateMaxScale(value: unknown): number {
+  if (!isFiniteNumber(value)) return DEFAULT_MAX_SCALE;
+  if (value < MAX_SCALE_MIN) return MAX_SCALE_MIN;
+  if (value > MAX_SCALE_MAX) return MAX_SCALE_MAX;
+  return value;
+}
+
+/**
  * Encode a validated theme as URL-safe base64(JSON). Skips null/undefined
  * fields so the encoded payload only carries keys actually set by the host.
  *
@@ -231,6 +274,15 @@ export function validateAllowReferralChoice(value: unknown): boolean {
  * `true`. The default (`false` / `undefined`) is omitted so a no-config embed
  * produces a payload byte-identical to the prior protocol output.
  *
+ * An optional layout options bag carries the autoscale feature. `autoscale`
+ * is attached under the top-level `autoscale` key ONLY when it is the strict
+ * boolean `true`; when it is, `maxScale` rides alongside it under the
+ * `maxScale` key (already validated/clamped by the caller). When autoscale is
+ * absent / false BOTH keys are omitted, so an embed that does not opt into
+ * autoscale produces a payload byte-identical to the prior protocol output.
+ * The trailing `options` argument is a bag rather than two more positional
+ * params so existing positional callers stay byte-identical.
+ *
  * Browser path uses `btoa(JSON.stringify(payload))`. Node fallback (tests)
  * uses `Buffer.from(...).toString('base64')`. Either way the output is
  * standard base64 - the dapp side decodes with the matching primitive.
@@ -238,7 +290,8 @@ export function validateAllowReferralChoice(value: unknown): boolean {
 export function encodeTheme(
   theme: ThemeOptions,
   chrome?: ChromeOptions | null,
-  allowReferralChoice?: boolean
+  allowReferralChoice?: boolean,
+  options?: { autoscale?: boolean; maxScale?: number } | null
 ): string {
   const compact: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(theme)) {
@@ -257,6 +310,14 @@ export function encodeTheme(
   }
   if (allowReferralChoice === true) {
     compact['allowReferralChoice'] = true;
+  }
+  // autoscale + maxScale: only carried when autoscale is the strict boolean
+  // `true`. maxScale is meaningless without autoscale, so it rides only when
+  // the flag is on. Both keys are omitted otherwise so the default-off path is
+  // byte-identical to prior output.
+  if (options?.autoscale === true) {
+    compact['autoscale'] = true;
+    compact['maxScale'] = validateMaxScale(options.maxScale);
   }
   const json = JSON.stringify(compact);
   if (typeof btoa === 'function') {

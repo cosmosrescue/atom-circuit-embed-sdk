@@ -114,6 +114,25 @@ export interface AtomCircuitSwapProps {
    * {@link MountOptions.allowReferralChoice}.
    */
   allowReferralChoice?: boolean;
+  /**
+   * Whether the embed scales its whole UI up proportionally to fill the
+   * available width. Default `false`. When `false` the embed renders at its
+   * natural density and reflows fluidly (unchanged behaviour). When `true`,
+   * once the available width exceeds the widget's natural design width (480px)
+   * the embed scales its entire geometry up (text, buttons, icons, padding all
+   * grow together) up to {@link AtomCircuitSwapProps.maxScale}; past that cap
+   * the scaled widget sits centered. Below 480px it falls back to fluid
+   * behaviour so it never overflows narrow containers. See
+   * {@link MountOptions.autoscale}.
+   */
+  autoscale?: boolean;
+  /**
+   * Maximum scale factor when {@link AtomCircuitSwapProps.autoscale} is `true`.
+   * Default `1.5`, clamped to `[1.0, 3.0]` (out-of-range / non-finite values
+   * fall back to the default). Ignored when autoscale is off. See
+   * {@link MountOptions.maxScale}.
+   */
+  maxScale?: number;
   /** CSS width for the iframe. Default `'100%'`. */
   width?: string;
   /** CSS max-width for the iframe. Default unset. */
@@ -200,6 +219,12 @@ export function AtomCircuitSwap(props: AtomCircuitSwapProps): ReactElement | nul
       ...(propsRef.current.chrome !== undefined ? { chrome: propsRef.current.chrome } : {}),
       ...(propsRef.current.allowReferralChoice !== undefined
         ? { allowReferralChoice: propsRef.current.allowReferralChoice }
+        : {}),
+      ...(propsRef.current.autoscale !== undefined
+        ? { autoscale: propsRef.current.autoscale }
+        : {}),
+      ...(propsRef.current.maxScale !== undefined
+        ? { maxScale: propsRef.current.maxScale }
         : {}),
       ...(propsRef.current.width !== undefined ? { width: propsRef.current.width } : {}),
       ...(propsRef.current.maxWidth !== undefined ? { maxWidth: propsRef.current.maxWidth } : {}),

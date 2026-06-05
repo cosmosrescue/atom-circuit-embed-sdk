@@ -18,8 +18,8 @@ For static sites that do not bundle, load the IIFE from a CDN with a pinned Subr
 
 ```html
 <script
-  src="https://unpkg.com/@atom-circuit/embed-sdk@2.2.0/dist/atom-circuit.iife.js"
-  integrity="sha384-j2or14ssl/NImUjt50RSLgSJCB6aT3+ljALwwDC3VeBiexXl/HNp8qXCbQ46mZTV"
+  src="https://unpkg.com/@atom-circuit/embed-sdk@2.3.1/dist/atom-circuit.iife.js"
+  integrity="sha384-HupUMMdBD4mVAOQeYUZ7sf4KC7HWmOKwNC3l4kuOQ7/ATqOWx751/x4rdJQp/mly"
   crossorigin="anonymous"
 ></script>
 ```
@@ -40,7 +40,7 @@ Pick the stack you ship with. Replace `YOUR_REFERRAL_ID` with the value from you
 
 ```html
 <div id="atom-circuit-widget"></div>
-<script src="https://unpkg.com/@atom-circuit/embed-sdk@2.2.0/dist/atom-circuit.iife.js"></script>
+<script src="https://unpkg.com/@atom-circuit/embed-sdk@2.3.1/dist/atom-circuit.iife.js"></script>
 <script>
   AtomCircuit.mount(document.getElementById('atom-circuit-widget'), {
     referralId: 'YOUR_REFERRAL_ID',
@@ -127,6 +127,8 @@ Each app contains the minimal, full, parent-wallet, and parent-wallet-cosmoskit 
 | ------------------------ | ------------ | ----------- | -------------------------------------------------------------------- |
 | `referralId`             | Optional     | `'general'` | Which validator the affiliate fee stakes to. Omit to split across all participating validators. |
 | `allowReferralChoice`    | Optional     | `false`     | Render a validator picker so the end user can change the validator.  |
+| `autoscale`              | Optional     | `false`     | Scale the whole widget up to fill a wide container. See [Autoscale](#autoscale). |
+| `maxScale`               | Optional     | `1.5`       | Cap for `autoscale`, clamped to `[1.0, 3.0]`. Ignored when `autoscale` is off. |
 | `width` / `maxWidth` / `minHeight` / `padding` | Optional | see [Sizing](#sizing) | Layout of the widget wrapper.                              |
 | `theme`                  | Optional     | dark preset | Color palette and typography. See [Theming](#theming).               |
 | `chrome`                 | Optional     | all visible | Hide individual surfaces (logo, wallet button, validator row, footer). |
@@ -142,6 +144,9 @@ const { iframe, wrapper, client, destroy } = AtomCircuit.mount(container, {
   referralId: 'YOUR_REFERRAL_ID',
   // let the end user pick the validator (default false); referralId is the pre-selected default
   allowReferralChoice: false,
+  // scale the whole widget up on wide containers (default false); cap at 1.5x
+  autoscale: false,
+  maxScale: 1.5,
   // sizing - all optional
   width: '100%',
   maxWidth: '480px',
@@ -170,6 +175,20 @@ Same options as `mount`, expressed as React props. Re-mounts the iframe only whe
 ### Letting the user choose the validator
 
 By default the host site's `referralId` is fixed and the end user cannot change it. Set `allowReferralChoice: true` to render a validator picker inside the widget: your `referralId` becomes the pre-selected default, the user can switch to any participating validator (or clear it to split across all via `general`), and their choice is remembered across reloads. Leaving it `false` (the default) is fully backwards-compatible - the fixed-`referralId` behaviour is unchanged.
+
+### Autoscale
+
+The widget is designed around a natural width of `480px`. In a container wider than that, the default behaviour leaves the widget at its natural density with the extra space unused, so on a wide layout the form can look small and lost. Set `autoscale: true` to make the embed scale its ENTIRE geometry up proportionally - text, buttons, icons, input fields, and spacing all grow together - so a wide container shows a correspondingly larger, more legible widget instead of a small one floating in empty space.
+
+The scale factor is `clamp(availableWidth / 480, 1.0, maxScale)`:
+
+- Below `480px` of available width, autoscale does nothing: the widget falls back to the default fluid behaviour and reflows to fit, so it never overflows a narrow container or a mobile viewport. There is no horizontal scrollbar.
+- Between `480px` and `480 * maxScale`, the widget scales up linearly with the available width, filling it edge to edge at the matching scale factor.
+- Past `480 * maxScale`, the widget stops growing and sits centered at `maxScale`, so it never stretches beyond its intended proportions on an ultra-wide container.
+
+`maxScale` (default `1.5`) caps the growth and is clamped to `[1.0, 3.0]`; an out-of-range or non-finite value falls back to `1.5`. Setting `maxScale: 1.0` keeps the widget at its natural size on every container (autoscale on, but no growth). `maxScale` is ignored when `autoscale` is `false`.
+
+Leaving `autoscale` off (the default) is byte-identical to the prior behaviour: no scaling, no layout change. The widget's reported height tracks the scaled content automatically, so the iframe still resizes to fit with no internal scrollbar.
 
 ## Reusing the parent page's wallet
 
@@ -328,8 +347,8 @@ The IIFE build exposes the same wallet helpers on the `AtomCircuit` global, so a
 
 ```html
 <script
-  src="https://unpkg.com/@atom-circuit/embed-sdk@2.2.0/dist/atom-circuit.iife.js"
-  integrity="sha384-j2or14ssl/NImUjt50RSLgSJCB6aT3+ljALwwDC3VeBiexXl/HNp8qXCbQ46mZTV"
+  src="https://unpkg.com/@atom-circuit/embed-sdk@2.3.1/dist/atom-circuit.iife.js"
+  integrity="sha384-HupUMMdBD4mVAOQeYUZ7sf4KC7HWmOKwNC3l4kuOQ7/ATqOWx751/x4rdJQp/mly"
   crossorigin="anonymous"
 ></script>
 <script>
@@ -524,7 +543,7 @@ Use `AtomCircuit.mount()` directly into a persistent DOM container outside the r
 
 ```html
 <div id="atom-circuit-widget" style="display: none;"></div>
-<script src="https://unpkg.com/@atom-circuit/embed-sdk@2.2.0/dist/atom-circuit.iife.js"></script>
+<script src="https://unpkg.com/@atom-circuit/embed-sdk@2.3.1/dist/atom-circuit.iife.js"></script>
 <script>
   AtomCircuit.mount(document.getElementById('atom-circuit-widget'), {
     referralId: 'YOUR_REFERRAL_ID',
@@ -558,8 +577,8 @@ Current SRI hash:
 
 ```html
 <script
-  src="https://unpkg.com/@atom-circuit/embed-sdk@2.2.0/dist/atom-circuit.iife.js"
-  integrity="sha384-j2or14ssl/NImUjt50RSLgSJCB6aT3+ljALwwDC3VeBiexXl/HNp8qXCbQ46mZTV"
+  src="https://unpkg.com/@atom-circuit/embed-sdk@2.3.1/dist/atom-circuit.iife.js"
+  integrity="sha384-HupUMMdBD4mVAOQeYUZ7sf4KC7HWmOKwNC3l4kuOQ7/ATqOWx751/x4rdJQp/mly"
   crossorigin="anonymous"
 ></script>
 ```
@@ -567,7 +586,7 @@ Current SRI hash:
 Verify the hash yourself:
 
 ```sh
-curl -sL https://unpkg.com/@atom-circuit/embed-sdk@2.2.0/dist/atom-circuit.iife.js \
+curl -sL https://unpkg.com/@atom-circuit/embed-sdk@2.3.1/dist/atom-circuit.iife.js \
   | openssl dgst -sha384 -binary | openssl base64 -A
 ```
 

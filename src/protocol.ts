@@ -700,6 +700,46 @@ export interface MountOptions {
    */
   readonly allowReferralChoice?: boolean;
   /**
+   * Whether the embed scales its whole UI up proportionally to fill the
+   * available width. Default `false`.
+   *
+   * - When `false` (default): the embed renders at its natural density and
+   *   reflows fluidly inside whatever width the host gives it (the prior,
+   *   unchanged behaviour). No scaling is applied.
+   * - When `true`: once the available width exceeds the widget's natural
+   *   design width (480px), the embed scales its ENTIRE geometry up - text,
+   *   buttons, icons, padding all grow together - so a wide container shows a
+   *   larger, more legible widget instead of a small widget floating in empty
+   *   space. The scale factor is `clamp(availableWidth / 480, 1.0, maxScale)`.
+   *   Past `480 * maxScale` the scaled widget sits centered rather than
+   *   stretching its proportions. Below 480px the embed falls back to the
+   *   default fluid behaviour (no scaling), so it never overflows a narrow
+   *   container or mobile viewport.
+   *
+   * Encoded alongside `theme` + `chrome` inside the `?theme=` base64-JSON
+   * payload under the top-level `autoscale` key. Only the literal boolean
+   * `true` is carried on the wire; any other value (including the default
+   * `false`) is omitted so a no-config embed is byte-identical to the prior
+   * protocol output. See {@link MountOptions.maxScale}.
+   */
+  readonly autoscale?: boolean;
+  /**
+   * The maximum scale factor applied when {@link MountOptions.autoscale} is
+   * `true`. Default `1.5`. Clamped to the inclusive range `[1.0, 3.0]`; an
+   * out-of-range or non-finite value falls back to the `1.5` default rather
+   * than rejecting the rest of the payload.
+   *
+   * Only meaningful when `autoscale` is `true`; ignored otherwise. A value of
+   * `1.0` pins the embed to its natural size even on very wide containers
+   * (autoscale on, but no growth); `3.0` lets it grow up to triple size.
+   *
+   * Encoded alongside `autoscale` inside the same `?theme=` payload under the
+   * top-level `maxScale` key, but ONLY when `autoscale` is `true` (the value
+   * is meaningless without it). The default `1.5` is still written explicitly
+   * when autoscale is on so the dapp side need not duplicate the default.
+   */
+  readonly maxScale?: number;
+  /**
    * CSS `width` applied to the iframe. Default `'100%'` when omitted.
    */
   readonly width?: string;
