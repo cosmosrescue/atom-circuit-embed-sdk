@@ -178,7 +178,7 @@ By default the host site's `referralId` is fixed and the end user cannot change 
 
 ### Autoscale
 
-The widget is designed around a natural width of `480px`. In a container wider than that, the default behaviour leaves the widget at its natural density with the extra space unused, so on a wide layout the form can look small and lost. Set `autoscale: true` to make the embed scale its ENTIRE geometry up proportionally - text, buttons, icons, input fields, and spacing all grow together - so a wide container shows a correspondingly larger, more legible widget instead of a small one floating in empty space.
+The widget is designed around a natural width of `480px`. In a container wider than that, the default behaviour leaves the widget at its natural density with the extra space unused, so on a wide layout the form can look small and lost. Set `autoscale: true` to make the embed scale its entire geometry up proportionally - text, buttons, icons, input fields, and spacing all grow together - so a wide container shows a correspondingly larger, more legible widget instead of a small one floating in empty space.
 
 The scale factor is `clamp(availableWidth / 480, 1.0, maxScale)`:
 
