@@ -215,8 +215,8 @@ import { fromCosmosKit } from '@atom-circuit/embed-sdk';
 
 const { status, chainWallet } = useChain('cosmoshub');
 
-// IMPORTANT: useChain() does NOT return a top-level `client`.
-// The wallet client lives at chainWallet.client, and it only exists AFTER connect.
+// Note: useChain() does not return a top-level `client`.
+// The wallet client lives at chainWallet.client, and it only exists after connect.
 const cosmosClient = chainWallet?.client;
 
 const cosmos = useMemo(
